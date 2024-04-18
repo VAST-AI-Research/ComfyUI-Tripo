@@ -10,7 +10,7 @@ class Visualizer {
       overflow: "hidden",
     });
     this.iframe.src =
-      "/extensions/ComfyUI-TripoAPI/html/" + visualSrc + ".html";
+      "/extensions/ComfyUI-Tripo/html/" + visualSrc + ".html";
     container.appendChild(this.iframe);
   }
 
