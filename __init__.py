@@ -94,14 +94,73 @@ class TripoAPIDraft:
         else:
             raise RuntimeError(f"Failed to generate mesh: {result['message']}")
 
+class TripoAnimateRigNode:
+    @classmethod
+    def INPUT_TYPES(s):
+        config = {
+            "required": {
+                "original_model_task_id": ("TASK_ID",),
+            }
+        }
+        if not tripo_api_key:
+            config["required"]["apikey"] = ("STRING")
+        return config
+
+    RETURN_TYPES = ("MESH", "TASK_ID")
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    def generate_mesh(self, original_model_task_id, apiKey = None):
+        if original_model_task_id is None or original_model_task_id == "":
+            raise RuntimeError("original_model_task_id is required")
+        api = GetTripoAPI(apiKey)
+        result = api.animate_rig(original_model_task_id)
+        if result['status'] == 'success':
+            return ([result['model']], result['task_id'])
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+
+class TripoAnimateRetargetNode:
+    @classmethod
+    def INPUT_TYPES(s):
+        config = {
+            "required": {
+                "original_model_task_id": ("TASK_ID",),
+                "mode": (["preset:walk", "preset:run", "preset:dive"],),
+            }
+        }
+        if not tripo_api_key:
+            config["required"]["apikey"] = ("STRING")
+        return config
+
+    RETURN_TYPES = ("MESH",)
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    def generate_mesh(self, mode, original_model_task_id, animation = None, apiKey = None):
+        animation = mode
+        if original_model_task_id is None or original_model_task_id == "":
+            raise RuntimeError("original_model_task_id is required")
+        if animation is None or animation == "":
+            raise RuntimeError("Animation is required")
+        api = GetTripoAPI(apiKey)
+        result = api.animate_retarget(original_model_task_id, animation)
+        if result['status'] == 'success':
+            return ([result['model']], result['task_id'])
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
 
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
+    "TripoAnimateRigNode": TripoAnimateRigNode,
+    "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
     "TripoGLBViewer": TripoGLBViewer,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoAPIDraft": "Tripo: Generate Draft model",
+    "TripoAnimateRigNode": "Tripo: Rig Draft model",
+    "TripoAnimateRetargetNode": "Tripo: Actuate rigged model",
     "TripoGLBViewer": "Tripo: GLB Viewer",
 }
 
