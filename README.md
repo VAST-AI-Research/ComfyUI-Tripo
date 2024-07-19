@@ -32,6 +32,7 @@ If you have a comfy-cli, you can simply execute `comfy node registry-install com
             TRIPO_API_KEY=tsk_XXXXXXX python main.py [--cpu]
             ```
     * [Method2] Set your Tripo API key in node input field.
+    * [Method3] Set your Tripo API key in `config.json`.
 
 Usually it will take 10~15s to generate a draft model.
 
@@ -55,10 +56,11 @@ This node allows you to generate a 3D model from an input image using the Tripo 
 - The node will output a GLB file containing the generated 3D model.
 
 ### Download Model
-Models will be automatically downloaded after generation in `ComfyUI-Tripo\output` folder.
+Models will be automatically downloaded after generation in `ComfyUI\output` folder.
 
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.
 
 ## Credit
 Thanks for awesome 3d pack visualization from [ComfyUI-3D-Pack](https://github.com/MrForExample/ComfyUI-3D-Pack)
+Thansk for initial repo from [Tripo-API-ZHO](https://github.com/ZHO-ZHO-ZHO/Tripo-API-ZHO)
