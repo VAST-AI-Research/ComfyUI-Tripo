@@ -3,8 +3,7 @@ from os import path
 import os
 sys.path.insert(0, path.dirname(__file__))
 
-from api.utils import tensor_to_pil_base64
-from api.system import TripoAPI
+from api.system import TripoAPI, save_tensor
 from folder_paths import get_save_image_path, get_output_directory
 
 class TripoGLBViewer:
@@ -92,9 +91,9 @@ class TripoAPIImageToMeshNode:
         if image is None:
             raise RuntimeError("Image is required")
         self.api = TripoAPI(apiKey)
+        image_name = save_tensor(image, os.path.join(get_output_directory(), "image"))
         # convert tensor image to normal image
-        image_data = tensor_to_pil_base64(image)
-        result = self.api.image_to_3d(image_data)
+        result = self.api.image_to_3d(image_name)
 
         if result['status'] == 'success':
             return ([result['model']], result['task_id'])

@@ -1,5 +1,43 @@
 import requests
 import time
+import torch
+from PIL import Image
+
+
+def save_tensor(image_tensor, filename):
+    # Assuming the first dimension is the batch size, select the first image
+    if image_tensor.dim() > 3:
+        image_tensor = image_tensor[0]  # Select the first image in the batch
+
+    # Convert from float tensors to uint8
+    if image_tensor.dtype == torch.float32:
+        image_tensor = (image_tensor * 255).byte()
+
+    # Check if it's a single color channel (grayscale) and needs color dimension expansion
+    if image_tensor.dim() == 2:
+        image_tensor = image_tensor.unsqueeze(0)  # Add a channel dimension
+
+    # Permute the tensor dimensions if it's in C x H x W format to H x W x C for RGB
+    if image_tensor.dim() == 3 and image_tensor.size(0) == 3:
+        image_tensor = image_tensor.permute(1, 2, 0)
+
+    # Ensure tensor is on the CPU
+    if image_tensor.is_cuda:
+        image_tensor = image_tensor.cpu()
+
+    # Convert to numpy array
+    image_np = image_tensor.numpy()
+
+    # Convert numpy array to PIL Image
+    image_pil = Image.fromarray(image_np)
+
+    if image_np.shape[2] == 4:
+        name = filename + '.png'
+        image_pil.save(name, 'PNG')
+    else:
+        name = filename + '.jpg'
+        image_pil.save(name, 'JPEG')
+    return name
 
 
 class TripoAPI:
@@ -12,17 +50,40 @@ class TripoAPI:
     def text_to_3d(self, prompt):
         start_time = time.time()
         response = self._submit_task(
-            "text_to_model", {"prompt": prompt}, start_time)
+            "text_to_model",
+            {
+                "prompt": prompt
+            },
+            start_time)
         return self._handle_task_response(response, start_time)
 
-    def image_to_3d(self, image_data):
+    def image_to_3d(self, image_name):
         start_time = time.time()
-        file_data = {
-            "type": "png",  # Assume PNG for simplicity; adjust as needed
-            "data": image_data
-        }
+        with open(image_name, 'rb') as f:
+            files = {
+                'file': (image_name, f, 'image/jpeg')
+            }
+            headers = {
+                "Authorization": f"Bearer {self.api_key}"
+            }
+            response = requests.post("https://api.tripo3d.ai/v2/openapi/upload", headers=headers, files=files)
+        if response.status_code == 200:
+            image_token = response.json()['data']['image_token']
+        else:
+            return {
+                'status': 'error',
+                'message': response.json().get('message', 'An unexpected error occurred'),
+                'task_id': None
+                }
         response = self._submit_task(
-            "image_to_model", {"file": file_data}, start_time)
+            "image_to_model", 
+            {
+                "file": {
+                    "type": "png",  # Assume PNG for simplicity; adjust as needed
+                    "file_token": image_token
+                }
+            },
+            start_time)
         return self._handle_task_response(response, start_time)
 
     def _submit_task(self, task_type, task_payload, start_time):
@@ -75,7 +136,7 @@ class TripoAPI:
                     print(f"Task Progress: {progress}%")
                     last_progress = progress
 
-                if status in ['success', 'failed', 'cancelled', 'unknown']:
+                if status not in ['queued', 'running']:
                     if status == 'success':
                         print("Task completed successfully.")
                         return self._download_model(data['output']['model'], task_id)
