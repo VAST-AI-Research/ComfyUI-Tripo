@@ -12,4 +12,4 @@ Repository = "https://github.com/VAST-AI-Research/ComfyUI-Tripo"
 [tool.comfy]
 PublisherId = "seed93"
 DisplayName = "ComfyUI-Tripo"
-Icon = ""
+Icon = "https://www.tripo3d.ai/v1/favicon.png"

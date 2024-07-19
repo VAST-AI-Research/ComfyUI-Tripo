@@ -7,11 +7,18 @@ This extension integrates Tripo into ComfyUI, allowing users to generate 3D mode
 - View generated 3D models directly in ComfyUI using the TripoGLB Viewer node
 
 ## Installation
+### [method1] From Source
 - Clone or download this repository into your `ComfyUI/custom_nodes/` directory.
 - Install the required dependencies by running `pip install -r requirements.txt`.
-- (Optional) Set your Tripo API key as an environment variable named `TRIPO_API_KEY` in your env variables.
+
+### [method2] From [ComfyUI-Manager](https://github.com/ltdrdata/ComfyUI-Manager)
+If you have ComfyUI-Manager, you can simply search "Tripo for ComfyUI" from `Custom Nodes Manager` and install these custom nodes 
+
+### [method3] From [Comfy Register](https://registry.comfy.org/) using [comfy-cli](https://github.com/Comfy-Org/comfy-cli)
+If you have a comfy-cli, you can simply execute `comfy node registry-install comfyui-tripo` in command line.
 
 ## Usage
+- (Optional) Set your Tripo API key as an environment variable named `TRIPO_API_KEY` in your env variables.
 Usually it will take 10~20s to generate a model.
 
 ### Tripo API Text to Mesh Node
