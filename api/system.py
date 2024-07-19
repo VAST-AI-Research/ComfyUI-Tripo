@@ -88,27 +88,17 @@ class TripoAPI:
 
     def animate_rig(self, original_model_task_id, out_format="glb"):
         start_time = time.time()
-        task_id = original_model_task_id
-        original_response = requests.get(
-            f"{self.api_url}/task/{task_id}",
-            headers={"Authorization": f"Bearer {self.api_key}"}
-        ).json()
         response = self._submit_task(
             "animate_rig",
-            {"original_model_task_id": original_response['data']['task_id'], "out_format": out_format},
+            {"original_model_task_id": original_model_task_id, "out_format": out_format},
             start_time)
         return self._handle_task_response(response, start_time)
 
     def animate_retarget(self, original_model_task_id, animation, out_format="glb"):
         start_time = time.time()
-        task_id = original_model_task_id
-        original_response = requests.get(
-            f"{self.api_url}/task/{task_id}",
-            headers={"Authorization": f"Bearer {self.api_key}"}
-        ).json()
         response = self._submit_task(
             "animate_retarget",
-            {"original_model_task_id": original_response['data']['task_id'], "out_format": out_format,
+            {"original_model_task_id": original_model_task_id, "out_format": out_format,
              "animation": animation},
             start_time)
         return self._handle_task_response(response, start_time)
