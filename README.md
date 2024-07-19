@@ -63,4 +63,5 @@ This project is licensed under the MIT License. See the LICENSE file for details
 
 ## Credit
 Thanks for awesome 3d pack visualization from [ComfyUI-3D-Pack](https://github.com/MrForExample/ComfyUI-3D-Pack)
+
 Thansk for initial repo from [Tripo-API-ZHO](https://github.com/ZHO-ZHO-ZHO/Tripo-API-ZHO)

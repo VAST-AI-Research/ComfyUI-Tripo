@@ -1,10 +1,17 @@
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
+
+const min_width = 600, min_height = 500;
 
 class Visualizer {
   constructor(node, container, visualSrc) {
     this.node = node;
 
     this.iframe = document.createElement("iframe");
+    console.log(this.iframe);
+    const iframeDocument = this.iframe.contentWindow.document;
+    this.model_viewer = iframeDocument.getElementById("model-viewer");
+    // this.model_div = iframeDocument.getElementById("model-div");
     Object.assign(this.iframe, {
       scrolling: "no",
       overflow: "hidden",
@@ -15,9 +22,10 @@ class Visualizer {
   }
 
   updateVisual(params) {
-    const iframeDocument = this.iframe.contentWindow.document;
-    const previewScript = iframeDocument.getElementById("visualizer");
-    previewScript.setAttribute("filepath", JSON.stringify(params));
+    const url = api
+      .apiURL("/view?" + new URLSearchParams(params))
+      .replace(/extensions.*\//, "");
+    this.model_viewer.setAttribute("src", url);
   }
 
   remove() {
@@ -33,11 +41,13 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
     name: "preview3d",
     callback: () => {},
     draw: function (ctx, node, widgetWidth, widgetY, widgetHeight) {
+      console.log(widgetWidth, widgetY, widgetHeight);
       const margin = 10;
       const top_offset = 5;
       const visible = app.canvas.ds.scale > 0.5 && this.type === typeName;
       const w = widgetWidth - margin * 4;
       const clientRectBound = ctx.canvas.getBoundingClientRect();
+      console.log(clientRectBound)
       const transform = new DOMMatrix()
         .scaleSelf(
           clientRectBound.width / ctx.canvas.width,
@@ -45,7 +55,7 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
         )
         .multiplySelf(ctx.getTransform())
         .translateSelf(margin, margin + widgetY);
-
+      console.log(transform);
       Object.assign(this.visualizer.style, {
         left: `${transform.a * margin + transform.e}px`,
         top: `${transform.d + transform.f + top_offset}px`,
@@ -66,6 +76,9 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
       });
 
       this.visualizer.hidden = !visible;
+      this.model_viewer.setAttribute("width", widgetWidth);
+      // this.model_div.setAttribute("width", widgetWidth);
+      // this.model_div.setAttribute("height", widgetWidth);
     },
   };
 
@@ -75,8 +88,10 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
   node.visualizer = new Visualizer(node, container, typeName);
   widget.visualizer = container;
   widget.parent = node;
+  widget.model_viewer = node.visualizer.model_viewer;
+  // widget.model_div = node.visualizer.model_div;
 
-  document.body.appendChild(widget.visualizer);
+  document.body.appendChild(container);
 
   node.addCustomWidget(widget);
 
@@ -96,13 +111,11 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
   // Make sure visualization iframe is always inside the node when resize the node
   node.onResize = function () {
     let [w, h] = this.size;
-    if (w <= 600) w = 600;
-    if (h <= 500) h = 500;
-
-    if (w > 600) {
+    if (w <= min_width) w = min_width;
+    if (h <= min_height) h = min_height;
+    if (w > min_width) {
       h = w - 100;
     }
-
     this.size = [w, h];
   };
 
@@ -146,7 +159,7 @@ function registerVisualizer(nodeType, nodeData, nodeClassName, typeName) {
         app,
       ]);
 
-      this.setSize([600, 500]);
+      this.setSize([min_width, min_height]);
 
       return r;
     };
@@ -165,6 +178,6 @@ app.registerExtension({
   async init(app) {},
 
   async beforeRegisterNodeDef(nodeType, nodeData, app) {
-    registerVisualizer(nodeType, nodeData, "TripoGLBViewer", "threeVisualizer");
+    registerVisualizer(nodeType, nodeData, "TripoGLBViewer", "model-viewer");
   },
 });
