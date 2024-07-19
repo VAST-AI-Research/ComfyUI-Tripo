@@ -6,6 +6,13 @@ sys.path.insert(0, path.dirname(__file__))
 from api.system import TripoAPI, save_tensor
 from folder_paths import get_save_image_path, get_output_directory
 
+tripo_api_key = os.environ.get("TRIPO_API_KEY")
+def GetTripoAPI(apikey: str):
+    use_key = tripo_api_key if tripo_api_key else apiKey
+    if not use_key:
+        raise RuntimeError("TRIPO API key is required")
+    return TripoAPI(use_key)
+
 class TripoGLBViewer:
     @classmethod
     def INPUT_TYPES(s):
@@ -46,24 +53,24 @@ class TripoGLBViewer:
 class TripoAPITextToMeshNode:
     @classmethod
     def INPUT_TYPES(s):
-        return {
+        config = {
             "required": {
-                "apiKey": ("STRING", {"default": os.environ.get("TRIPO_API_KEY")}),
                 "prompt": ("STRING", {"multiline": True}),
             }
         }
+        if not tripo_api_key:
+            config["required"]["apikey"] = ("STRING")
+        return config
 
     RETURN_TYPES = ("MESH_GLB", "TASK_ID")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, apiKey, prompt):
-        if apiKey is None or apiKey == "":
-            raise RuntimeError("TRIPO API key is required")
-        self.api = TripoAPI(apiKey)
-        if prompt is None or prompt == "":
+    def generate_mesh(self, prompt, apiKey = None):
+        if not prompt:
             raise RuntimeError("Prompt is required")
-        result = self.api.text_to_3d(prompt)
+        api = GetTripoAPI(apiKey)
+        result = api.text_to_3d(prompt)
 
         if result['status'] == 'success':
             return ([result['model']], result['task_id'])
@@ -74,26 +81,25 @@ class TripoAPITextToMeshNode:
 class TripoAPIImageToMeshNode:
     @classmethod
     def INPUT_TYPES(s):
-        return {
+        config = {
             "required": {
-                "apiKey": ("STRING", {"default": os.environ.get("TRIPO_API_KEY")}),
                 "image": ("IMAGE",),
             }
         }
+        if not tripo_api_key:
+            config["required"]["apikey"] = ("STRING")
+        return config
 
     RETURN_TYPES = ("MESH_GLB", "TASK_ID")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, apiKey, image):
-        if apiKey is None or apiKey == "":
-            raise RuntimeError("TRIPO API key is required")
+    def generate_mesh(self, image, apiKey = None):
         if image is None:
             raise RuntimeError("Image is required")
-        self.api = TripoAPI(apiKey)
+        api = GetTripoAPI(apiKey)
         image_name = save_tensor(image, os.path.join(get_output_directory(), "image"))
-        # convert tensor image to normal image
-        result = self.api.image_to_3d(image_name)
+        result = api.image_to_3d(image_name)
 
         if result['status'] == 'success':
             return ([result['model']], result['task_id'])
