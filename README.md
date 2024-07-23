@@ -45,15 +45,14 @@ Load the png sceenshot in comyfui by dragging or loading manually.
 
 This node allows you to generate a 3D model from a text prompt using the Tripo API.
 
-- Enter your text prompt in the "prompt" field.
-- The node will output a GLB file containing the generated 3D model.
-
 ### Image to Mesh
 ![img](workflows/image_to_model.png)
 This node allows you to generate a 3D model from an input image using the Tripo API.
 
-- Connect an image output to the "image" input of the node.
-- The node will output a GLB file containing the generated 3D model.
+### Animation
+![img](workflows/retarget.png)
+This node allows you to generate a 3D model with skeleton and animation using the Tripo API.
+
 
 ### Download Model
 Models will be automatically downloaded after generation in `ComfyUI\output` folder.
@@ -62,5 +61,4 @@ Models will be automatically downloaded after generation in `ComfyUI\output` fol
 This project is licensed under the MIT License. See the LICENSE file for details.
 
 ## Credit
-Thanks for awesome 3d pack visualization from [ComfyUI-3D-Pack](https://github.com/MrForExample/ComfyUI-3D-Pack)
 Thansk for initial repo from [Tripo-API-ZHO](https://github.com/ZHO-ZHO-ZHO/Tripo-API-ZHO)

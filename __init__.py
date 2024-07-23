@@ -73,7 +73,7 @@ class TripoAPIDraft:
             config["required"]["apikey"] = ("STRING")
         return config
 
-    RETURN_TYPES = ("MESH", "TASK_ID", "API_KEY",)
+    RETURN_TYPES = ("MESH", "MODEL_TASK_ID", "API_KEY",)
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
@@ -99,14 +99,14 @@ class TripoRefineModel:
     def INPUT_TYPES(s):
         config = {
             "required": {
-                "model_task_id": ("TASK_ID",),
+                "model_task_id": ("MODEL_TASK_ID",),
             }
         }
         if not tripo_api_key:
             config["required"]["apikey"] = ("API_KEY")
         return config
 
-    RETURN_TYPES = ("Task_ID",)
+    RETURN_TYPES = ("MODEL_Task_ID",)
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
@@ -125,7 +125,7 @@ class TripoAnimateRigNode:
     def INPUT_TYPES(s):
         config = {
             "required": {
-                "original_model_task_id": ("TASK_ID",),
+                "original_model_task_id": ("MODEL_TASK_ID",),
             }
         }
         if not tripo_api_key:

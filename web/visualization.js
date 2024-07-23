@@ -1,4 +1,7 @@
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
+
+const min_width = 600, min_height = 500;
 
 class Visualizer {
   constructor(node, container, visualSrc) {
@@ -15,9 +18,10 @@ class Visualizer {
   }
 
   updateVisual(params) {
-    const iframeDocument = this.iframe.contentWindow.document;
-    const previewScript = iframeDocument.getElementById("visualizer");
-    previewScript.setAttribute("filepath", JSON.stringify(params));
+    this.model_viewer.src = api
+      .apiURL("/view?" + new URLSearchParams(params))
+      .replace(/extensions.*\//, "");
+    this.model_viewer.setAttribute("camera-orbit", "90deg 90deg 100%");
   }
 
   remove() {
@@ -32,6 +36,8 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
     type: typeName,
     name: "preview3d",
     callback: () => {},
+    model_viewer: null,
+    model_div: null,
     draw: function (ctx, node, widgetWidth, widgetY, widgetHeight) {
       const margin = 10;
       const top_offset = 5;
@@ -45,7 +51,6 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
         )
         .multiplySelf(ctx.getTransform())
         .translateSelf(margin, margin + widgetY);
-
       Object.assign(this.visualizer.style, {
         left: `${transform.a * margin + transform.e}px`,
         top: `${transform.d + transform.f + top_offset}px`,
@@ -64,7 +69,11 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
         height: "100%",
         border: "0 none",
       });
-
+      if (this.model_viewer != null) {
+        this.model_viewer.style.width = this.visualizer.style.width;
+        this.model_viewer.style.height = this.visualizer.style.height;
+        console.log(this.model_viewer.getCameraOrbit());
+      }
       this.visualizer.hidden = !visible;
     },
   };
@@ -75,7 +84,12 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
   node.visualizer = new Visualizer(node, container, typeName);
   widget.visualizer = container;
   widget.parent = node;
-
+  node.visualizer.iframe.onload = () => {
+    const iframeDocument = node.visualizer.iframe.contentWindow.document;
+    node.visualizer.model_viewer = iframeDocument.getElementById("model-viewer");
+    widget.model_viewer = node.visualizer.model_viewer;
+    iframeDocument.body.style.margin = "0";
+  };
   document.body.appendChild(widget.visualizer);
 
   node.addCustomWidget(widget);
@@ -96,13 +110,13 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
   // Make sure visualization iframe is always inside the node when resize the node
   node.onResize = function () {
     let [w, h] = this.size;
-    if (w <= 600) w = 600;
-    if (h <= 500) h = 500;
+    w = Math.max(w, min_width);
+    h = Math.max(h, min_height);
 
-    if (w > 600) {
+
+    if (w > min_width) {
       h = w - 100;
     }
-
     this.size = [w, h];
   };
 
@@ -146,7 +160,7 @@ function registerVisualizer(nodeType, nodeData, nodeClassName, typeName) {
         app,
       ]);
 
-      this.setSize([600, 500]);
+      this.setSize([min_width, min_height]);
 
       return r;
     };
@@ -165,6 +179,6 @@ app.registerExtension({
   async init(app) {},
 
   async beforeRegisterNodeDef(nodeType, nodeData, app) {
-    registerVisualizer(nodeType, nodeData, "TripoGLBViewer", "threeVisualizer");
+    registerVisualizer(nodeType, nodeData, "TripoGLBViewer", "model-viewer");
   },
 });
