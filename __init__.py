@@ -73,7 +73,7 @@ class TripoAPIDraft:
             config["required"]["apikey"] = ("STRING")
         return config
 
-    RETURN_TYPES = ("MESH", "MODEL_TASK_ID", "API_KEY")
+    RETURN_TYPES = ("MESH", "MODEL_TASK_ID", "API_KEY",)
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
@@ -89,6 +89,32 @@ class TripoAPIDraft:
                 raise RuntimeError("Image is required")
             image_name = save_tensor(image, os.path.join(get_output_directory(), "image"))
             result = api.image_to_3d(image_name)
+        if result['status'] == 'success':
+            return ([result['model']], result['task_id'])
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+
+class TripoRefineModel:
+    @classmethod
+    def INPUT_TYPES(s):
+        config = {
+            "required": {
+                "model_task_id": ("MODEL_TASK_ID",),
+            }
+        }
+        if not tripo_api_key:
+            config["required"]["apikey"] = ("API_KEY")
+        return config
+
+    RETURN_TYPES = ("MODEL_Task_ID",)
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    def generate_mesh(self, draft_model_task_id, apiKey = None):
+        if not draft_model_task_id:
+            raise RuntimeError("original_model_task_id is required")
+        api = GetTripoAPI(apiKey)
+        result = api.refine_draft(draft_model_task_id)
         if result['status'] == 'success':
             return ([result['model']], result['task_id'])
         else:
@@ -151,6 +177,7 @@ class TripoAnimateRetargetNode:
 
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
+    "TripoRefineModel": TripoRefineModel,
     "TripoAnimateRigNode": TripoAnimateRigNode,
     "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
     "TripoGLBViewer": TripoGLBViewer,
@@ -158,6 +185,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoAPIDraft": "Tripo: Generate Draft model",
+    "TripoRefineModel": "Tripo: Refine Draft model",
     "TripoAnimateRigNode": "Tripo: Rig Draft model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
     "TripoGLBViewer": "Tripo: GLB Viewer",

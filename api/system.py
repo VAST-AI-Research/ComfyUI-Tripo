@@ -39,9 +39,9 @@ def save_tensor(image_tensor, filename):
         image_pil.save(name, 'JPEG')
     return name
 
-
+# timeout = 120
 class TripoAPI:
-    def __init__(self, api_key, timeout=120):
+    def __init__(self, api_key, timeout=240):
         self.api_key = api_key
         self.api_url = "https://api.tripo3d.ai/v2/openapi"
         self.polling_interval = 2  # Poll every 2 seconds
@@ -86,6 +86,14 @@ class TripoAPI:
             start_time)
         return self._handle_task_response(response, start_time)
 
+    def refine_draft(self, draft_model_task_id):
+        start_time = time.time()
+        response = self._submit_task(
+            "refine_model",
+            {"draft_model_task_id": draft_model_task_id},
+            start_time)
+        return self._handle_task_response(response, start_time)
+
     def animate_rig(self, original_model_task_id, out_format="glb"):
         start_time = time.time()
         response = self._submit_task(
@@ -111,6 +119,8 @@ class TripoAPI:
             print(f"Task prompt: {task_payload['prompt']}")
         if 'file' in task_payload:
             print(f"Task file type: {task_payload['file']['type']}")
+        if 'draft_model_task_id' in task_payload:
+            print(f"Task draft model task ID: {task_payload['draft_model_task_id']}")
         if 'original_model_task_id' in task_payload and 'animation' not in task_payload:
             print(f"Task original id: {task_payload['original_model_task_id']}")
         if 'animation' in task_payload:
