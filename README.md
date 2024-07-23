@@ -49,6 +49,10 @@ This node allows you to generate a 3D model from a text prompt using the Tripo A
 ![img](workflows/image_to_model.png)
 This node allows you to generate a 3D model from an input image using the Tripo API.
 
+### Refine a draft Mesh
+![img](workflows/refine_model.png)
+This node allows you to refine a 3D model from a draft model using the Tripo API.
+
 ### Animation
 ![img](workflows/retarget.png)
 This node allows you to generate a 3D model with skeleton and animation using the Tripo API.
