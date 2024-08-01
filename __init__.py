@@ -15,10 +15,10 @@ if not tripo_api_key:
         tripo_api_key = config["TRIPO_API_KEY"]
 
 def GetTripoAPI(apikey: str):
-    apiKey = tripo_api_key if tripo_api_key else apiKey
-    if not apiKey:
+    apikey = tripo_api_key if tripo_api_key else apikey
+    if not apikey:
         raise RuntimeError("TRIPO API key is required")
-    return TripoAPI(apiKey), apiKey
+    return TripoAPI(apikey), apikey
 
 class TripoGLBViewer:
     @classmethod
@@ -69,16 +69,19 @@ class TripoAPIDraft:
                 "image": ("IMAGE",),
             }
         }
-        if not tripo_api_key:
-            config["required"]["apikey"] = ("STRING", {"default": ""})
+        # if not tripo_api_key:
+        config["required"]["apikey"] = ("STRING", {"default": ""})
         return config
 
-    RETURN_TYPES = ("MESH", "MODEL_TASK_ID", "API_KEY",)
+    if not tripo_api_key:
+        RETURN_TYPES = ("MESH", "MODEL_TASK_ID", "API_KEY",)
+    else:
+        RETURN_TYPES = ("MESH", "MODEL_TASK_ID",)
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, mode, prompt=None, image=None, apiKey = None):
-        api, key = GetTripoAPI(apiKey)
+    def generate_mesh(self, mode, prompt=None, image=None, apikey=None):
+        api, key = GetTripoAPI(apikey)
 
         if mode == "text_to_model":
             if not prompt:
@@ -110,10 +113,10 @@ class TripoRefineModel:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, draft_model_task_id, apiKey = None):
+    def generate_mesh(self, draft_model_task_id, apikey=None):
         if not draft_model_task_id:
             raise RuntimeError("original_model_task_id is required")
-        api, key = GetTripoAPI(apiKey)
+        api, key = GetTripoAPI(apikey)
         result = api.refine_draft(draft_model_task_id)
         if result['status'] == 'success':
             return ([result['model']], result['task_id'], key)
@@ -136,10 +139,10 @@ class TripoAnimateRigNode:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, original_model_task_id, apiKey = None):
+    def generate_mesh(self, original_model_task_id, apikey=None):
         if original_model_task_id is None or original_model_task_id == "":
             raise RuntimeError("original_model_task_id is required")
-        api, key = GetTripoAPI(apiKey)
+        api, key = GetTripoAPI(apikey)
         result = api.animate_rig(original_model_task_id)
         if result['status'] == 'success':
             return ([result['model']], result['task_id'], key)
@@ -163,12 +166,12 @@ class TripoAnimateRetargetNode:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, animation, original_model_task_id, apiKey = None):
+    def generate_mesh(self, animation, original_model_task_id, apikey=None):
         if not original_model_task_id:
             raise RuntimeError("original_model_task_id is required")
         if not animation:
             raise RuntimeError("Animation is required")
-        api, key = GetTripoAPI(apiKey)
+        api, key = GetTripoAPI(apikey)
         result = api.animate_retarget(original_model_task_id, animation)
         if result['status'] == 'success':
             return ([result['model']], result['task_id'], key)
