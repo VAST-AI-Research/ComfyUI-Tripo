@@ -2,7 +2,7 @@
 name = "comfyui-tripo"
 description = "Custom nodes for using [a/Tripo](https://www.tripo3d.ai/) in ComfyUI to create 3D from text and image prompts."
 version = "1.1.1"
-license = "LICENSE"
+license = { file = "LICENSE" }
 dependencies = ["requests", "numpy"]
 
 [project.urls]
