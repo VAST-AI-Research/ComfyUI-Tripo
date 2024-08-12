@@ -2,7 +2,9 @@ import requests
 import time
 import torch
 from PIL import Image
-
+import asyncio
+import websockets
+import json
 
 def save_tensor(image_tensor, filename):
     # Assuming the first dimension is the batch size, select the first image
@@ -134,53 +136,43 @@ class TripoAPI:
         )
         return response
 
+    async def _receive_one(self, task_id=None):
+        uri = f'wss://api.tripo3d.ai/v2/openapi/task/watch/{task_id}'
+        headers = {
+            "Authorization": f"Bearer {self.api_key}"
+        }
+        data = None
+        async with websockets.connect(uri, extra_headers=headers) as websocket:
+            while True:
+                message = await websocket.recv()
+                try:
+                    data = json.loads(message)
+                    status = data['data']['status']
+                    if status not in ['running', 'queued']:
+                        break
+                except json.JSONDecodeError:
+                    print("Received non-JSON message:", message)
+                    break
+        return data
+
     def _handle_task_response(self, response, start_time):
         if response.status_code == 200:
             task_id = response.json()['data']['task_id']
             print(f"Task ID: {task_id}")
-            return self._poll_task_status(task_id, start_time)
+            result = asyncio.run(self._receive_one(task_id))
+            status = result['data']['status']
+            if status == 'success':
+                print("Task completed successfully.")
+                return self._download_model(result['data']['output']['model'], task_id)
+            else:
+                print(f"Task did not complete successfully. Status: {status}")
+                return {'status': status, 'message': 'Task did not complete successfully', 'task_id': task_id}
         else:
             return {
                 'status': 'error',
                 'message': response.json().get('message', 'An unexpected error occurred'),
                 'task_id': None
             }
-
-    def _poll_task_status(self, task_id, start_time):
-        last_progress = -1
-        while True:
-            if time.time() - start_time > self.timeout:
-                print("Operation timed out.")
-                return {'status': 'error', 'message': 'Operation timed out', 'task_id': task_id}
-
-            response = requests.get(
-                f"{self.api_url}/task/{task_id}",
-                headers={"Authorization": f"Bearer {self.api_key}"}
-            )
-
-            if response.status_code == 200:
-                data = response.json()['data']
-                status = data['status']
-                progress = data.get('progress', 0)
-
-                # Print progress if it has changed.
-                if progress != last_progress:
-                    print(f"Task Progress: {progress}%")
-                    last_progress = progress
-
-                if status not in ['queued', 'running']:
-                    if status == 'success':
-                        print("Task completed successfully.")
-                        return self._download_model(data['output']['model'], task_id)
-                    else:
-                        print(
-                            f"Task did not complete successfully. Status: {status}")
-                        return {'status': status, 'message': 'Task did not complete successfully', 'task_id': task_id}
-            else:
-                print("Failed to get task status.")
-                return {'status': 'error', 'message': 'Failed to get task status', 'task_id': task_id}
-
-            time.sleep(self.polling_interval)  # Wait before polling again
 
     def _download_model(self, model_url, task_id):
         print(f"Downloading model: {model_url}")
