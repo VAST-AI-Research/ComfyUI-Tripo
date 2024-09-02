@@ -113,9 +113,9 @@ class TripoAPI:
             "multiview_to_model",
             {
                 "files": [
-                    {"type": "png", "file_token": image_tokens[0]},
-                    {"type": "png", "file_token": image_tokens[1]},
-                    {"type": "png", "file_token": image_tokens[2]}
+                    {"type": "jpg", "file_token": image_tokens[0]},
+                    {"type": "jpg", "file_token": image_tokens[1]},
+                    {"type": "jpg", "file_token": image_tokens[2]}
                 ],
                 "mode": mode
             },
