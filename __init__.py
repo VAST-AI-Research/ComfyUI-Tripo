@@ -101,9 +101,9 @@ class TripoAPIDraft:
                 raise RuntimeError("Multiview images are required")
             if multiview_mode is None:
                 raise RuntimeError("Mode is required")
-            image_front = save_tensor(image_front, os.path.join(get_output_directory(), "image"))
-            image_lr = save_tensor(image_lr, os.path.join(get_output_directory(), "image"))
-            image_back = save_tensor(image_back, os.path.join(get_output_directory(), "image"))
+            image_front = save_tensor(image_front, os.path.join(get_output_directory(), "image_front"))
+            image_lr = save_tensor(image_lr, os.path.join(get_output_directory(), "image_lr"))
+            image_back = save_tensor(image_back, os.path.join(get_output_directory(), "image_back"))
             image_names = [image_front, image_lr, image_back]
             result = api.multiview_to_3d(image_names, multiview_mode)
         if result['status'] == 'success':
