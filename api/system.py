@@ -219,11 +219,3 @@ class TripoAPI:
             return {'status': 'success', 'model': response.content, 'task_id': task_id}
         else:
             return {'status': 'error', 'message': 'Failed to download model', 'task_id': task_id}
-
-{'files':
-     {'type': 'png',
-      'files':
-         [{'type': 'png', 'file_token': 'c843c026-774a-4d54-80e3-e7a616f300c4'},
-          {'type': 'png', 'file_token': 'f72b7ed2-364a-4768-8b47-aae2fdd4c178'},
-          {'type': 'png', 'file_token': '13b8fac0-6db3-42ca-bd0d-7d32107a853b'}],
-      'mode': 'RIGHT'}}
