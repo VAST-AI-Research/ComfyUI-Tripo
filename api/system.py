@@ -88,6 +88,40 @@ class TripoAPI:
             start_time)
         return self._handle_task_response(response, start_time)
 
+    def multiview_to_3d(self, image_names, mode):
+        start_time = time.time()
+        headers = {
+            "Authorization": f"Bearer {self.api_key}"
+        }
+        image_tokens = []
+        for image_name in image_names:
+            with open(image_name, 'rb') as f:
+                files = {'file': (image_name, f, 'image/jpeg')}
+
+                response = requests.post("https://api.tripo3d.ai/v2/openapi/upload", headers=headers, files=files)
+                if response.status_code == 200:
+                    image_token = response.json()['data']['image_token']
+                    image_tokens.append(image_token)
+                else:
+                    return {
+                        'status': 'error',
+                        'message': response.json().get('message', 'An unexpected error occurred'),
+                        'task_id': None
+                    }
+
+        response = self._submit_task(
+            "multiview_to_model",
+            {
+                "files": [
+                    {"type": "png", "file_token": image_tokens[0]},
+                    {"type": "png", "file_token": image_tokens[1]},
+                    {"type": "png", "file_token": image_tokens[2]}
+                ],
+                "mode": mode
+            },
+            start_time)
+        return self._handle_task_response(response, start_time)
+
     def refine_draft(self, draft_model_task_id):
         start_time = time.time()
         response = self._submit_task(
@@ -121,6 +155,10 @@ class TripoAPI:
             print(f"Task prompt: {task_payload['prompt']}")
         if 'file' in task_payload:
             print(f"Task file type: {task_payload['file']['type']}")
+        if 'files' in task_payload:
+            print(task_payload)
+            print(f"Task files type: {task_payload['files'][0]['type']},\n"  # Assume all views are of the same type
+                  f"Task mode: {task_payload['mode']}")
         if 'draft_model_task_id' in task_payload:
             print(f"Task draft model task ID: {task_payload['draft_model_task_id']}")
         if 'original_model_task_id' in task_payload and 'animation' not in task_payload:
@@ -181,3 +219,11 @@ class TripoAPI:
             return {'status': 'success', 'model': response.content, 'task_id': task_id}
         else:
             return {'status': 'error', 'message': 'Failed to download model', 'task_id': task_id}
+
+{'files':
+     {'type': 'png',
+      'files':
+         [{'type': 'png', 'file_token': 'c843c026-774a-4d54-80e3-e7a616f300c4'},
+          {'type': 'png', 'file_token': 'f72b7ed2-364a-4768-8b47-aae2fdd4c178'},
+          {'type': 'png', 'file_token': '13b8fac0-6db3-42ca-bd0d-7d32107a853b'}],
+      'mode': 'RIGHT'}}
