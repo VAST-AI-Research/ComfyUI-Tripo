@@ -62,11 +62,14 @@ class TripoAPIDraft:
     def INPUT_TYPES(s):
         config = {
             "required": {
-                "mode": (["text_to_model", "image_to_model"],),
+                "mode": (["text_to_model", "image_to_model", "multiview_to_model"],),
             },
             "optional": {
                 "prompt": ("STRING", {"multiline": True}),
                 "image": ("IMAGE",),
+                "image_lr": ("IMAGE",),
+                "image_back": ("IMAGE",),
+                "multiview_mode": (["LEFT", "RIGHT"],),
             }
         }
         # if not tripo_api_key:
@@ -80,7 +83,7 @@ class TripoAPIDraft:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, mode, prompt=None, image=None, apikey=None):
+    def generate_mesh(self, mode, prompt=None, image=None, image_lr=None, image_back=None, multiview_mode=None, apikey=None):
         api, key = GetTripoAPI(apikey)
 
         if mode == "text_to_model":
@@ -92,6 +95,16 @@ class TripoAPIDraft:
                 raise RuntimeError("Image is required")
             image_name = save_tensor(image, os.path.join(get_output_directory(), "image"))
             result = api.image_to_3d(image_name)
+        elif mode == 'multiview_to_model':
+            if image is None or image_lr is None or image_back is None:
+                raise RuntimeError("Multiview images are required")
+            if multiview_mode is None:
+                raise RuntimeError("Mode is required")
+            image_front = save_tensor(image, os.path.join(get_output_directory(), "image_front"))
+            image_lr = save_tensor(image_lr, os.path.join(get_output_directory(), "image_lr"))
+            image_back = save_tensor(image_back, os.path.join(get_output_directory(), "image_back"))
+            image_names = [image_front, image_lr, image_back]
+            result = api.multiview_to_3d(image_names, multiview_mode)
         if result['status'] == 'success':
             return ([result['model']], result['task_id'], key)
         else:
