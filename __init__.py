@@ -67,7 +67,6 @@ class TripoAPIDraft:
             "optional": {
                 "prompt": ("STRING", {"multiline": True}),
                 "image": ("IMAGE",),
-                "image_front": ("IMAGE",),
                 "image_lr": ("IMAGE",),
                 "image_back": ("IMAGE",),
                 "multiview_mode": (["LEFT", "RIGHT"],),
@@ -84,7 +83,7 @@ class TripoAPIDraft:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, mode, prompt=None, image=None, image_front=None, image_lr=None, image_back=None, multiview_mode=None, apikey=None):
+    def generate_mesh(self, mode, prompt=None, image=None, image_lr=None, image_back=None, multiview_mode=None, apikey=None):
         api, key = GetTripoAPI(apikey)
 
         if mode == "text_to_model":
@@ -97,11 +96,11 @@ class TripoAPIDraft:
             image_name = save_tensor(image, os.path.join(get_output_directory(), "image"))
             result = api.image_to_3d(image_name)
         elif mode == 'multiview_to_model':
-            if image_front is None or image_lr is None or image_back is None:
+            if image is None or image_lr is None or image_back is None:
                 raise RuntimeError("Multiview images are required")
             if multiview_mode is None:
                 raise RuntimeError("Mode is required")
-            image_front = save_tensor(image_front, os.path.join(get_output_directory(), "image_front"))
+            image_front = save_tensor(image, os.path.join(get_output_directory(), "image_front"))
             image_lr = save_tensor(image_lr, os.path.join(get_output_directory(), "image_lr"))
             image_back = save_tensor(image_back, os.path.join(get_output_directory(), "image_back"))
             image_names = [image_front, image_lr, image_back]

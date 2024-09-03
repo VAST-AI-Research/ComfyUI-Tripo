@@ -49,6 +49,23 @@ class TripoAPI:
         self.polling_interval = 2  # Poll every 2 seconds
         self.timeout = timeout  # Timeout in seconds
 
+    def upload(self, image_name):
+        with open(image_name, 'rb') as f:
+            files = {
+                'file': (image_name, f, 'image/jpeg')
+            }
+            headers = {
+                "Authorization": f"Bearer {self.api_key}"
+            }
+            response = requests.post("https://api.tripo3d.ai/v2/openapi/upload", headers=headers, files=files)
+        if response.status_code == 200:
+            return response.json()['data']['image_token']
+        else:
+            return {
+                'status': 'error',
+                'message': response.json().get('message', 'An unexpected error occurred'),
+                'task_id': None
+                }
     def text_to_3d(self, prompt):
         start_time = time.time()
         response = self._submit_task(
@@ -61,27 +78,14 @@ class TripoAPI:
 
     def image_to_3d(self, image_name):
         start_time = time.time()
-        with open(image_name, 'rb') as f:
-            files = {
-                'file': (image_name, f, 'image/jpeg')
-            }
-            headers = {
-                "Authorization": f"Bearer {self.api_key}"
-            }
-            response = requests.post("https://api.tripo3d.ai/v2/openapi/upload", headers=headers, files=files)
-        if response.status_code == 200:
-            image_token = response.json()['data']['image_token']
-        else:
-            return {
-                'status': 'error',
-                'message': response.json().get('message', 'An unexpected error occurred'),
-                'task_id': None
-                }
+        image_token = self.upload(image_name)
+        if isinstance(image_token, dict):
+            return image_token
         response = self._submit_task(
             "image_to_model", 
             {
                 "file": {
-                    "type": "png",  # Assume PNG for simplicity; adjust as needed
+                    "type": "jpg",
                     "file_token": image_token
                 }
             },
@@ -95,19 +99,10 @@ class TripoAPI:
         }
         image_tokens = []
         for image_name in image_names:
-            with open(image_name, 'rb') as f:
-                files = {'file': (image_name, f, 'image/jpeg')}
-
-                response = requests.post("https://api.tripo3d.ai/v2/openapi/upload", headers=headers, files=files)
-                if response.status_code == 200:
-                    image_token = response.json()['data']['image_token']
-                    image_tokens.append(image_token)
-                else:
-                    return {
-                        'status': 'error',
-                        'message': response.json().get('message', 'An unexpected error occurred'),
-                        'task_id': None
-                    }
+            image_token = self.upload(image_name)
+            if isinstance(image_token, dict):
+                return image_token
+            image_tokens.append(image_token)
 
         response = self._submit_task(
             "multiview_to_model",
