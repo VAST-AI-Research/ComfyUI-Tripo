@@ -42,10 +42,11 @@ def save_tensor(image_tensor, filename):
     return name
 
 # timeout = 120
+tripo_base_url = "api.tripo3d.ai/v2/openapi"
 class TripoAPI:
     def __init__(self, api_key, timeout=240):
         self.api_key = api_key
-        self.api_url = "https://api.tripo3d.ai/v2/openapi"
+        self.api_url = f"https://{tripo_base_url}"
         self.polling_interval = 2  # Poll every 2 seconds
         self.timeout = timeout  # Timeout in seconds
 
@@ -57,7 +58,7 @@ class TripoAPI:
             headers = {
                 "Authorization": f"Bearer {self.api_key}"
             }
-            response = requests.post("https://api.tripo3d.ai/v2/openapi/upload", headers=headers, files=files)
+            response = requests.post(f"{self.api_url}/upload", headers=headers, files=files)
         if response.status_code == 200:
             return response.json()['data']['image_token']
         else:
@@ -66,54 +67,72 @@ class TripoAPI:
                 'message': response.json().get('message', 'An unexpected error occurred'),
                 'task_id': None
                 }
-    def text_to_3d(self, prompt):
+        
+    def text_to_3d(self, prompt, model_version, image_seed, model_seed, texture_seed):
         start_time = time.time()
+        param = {
+            "prompt": prompt
+        }
+        if model_version is not None:
+            param["model_version"] = model_version
+        if image_seed is not None:
+            param["image_seed"] = image_seed
+        if model_seed is not None:
+            param["model_seed"] = model_seed
+        if texture_seed is not None:
+            param["texture_seed"] = texture_seed
         response = self._submit_task(
             "text_to_model",
-            {
-                "prompt": prompt
-            },
+            param,
             start_time)
         return self._handle_task_response(response, start_time)
 
-    def image_to_3d(self, image_name):
+    def image_to_3d(self, image_name, model_version, model_seed, texture_seed):
         start_time = time.time()
         image_token = self.upload(image_name)
         if isinstance(image_token, dict):
             return image_token
+        param = {
+            "file": {
+                "type": "jpg",
+                "file_token": image_token
+            }
+        }
+        if model_version is not None:
+            param["model_version"] = model_version
+        if model_seed is not None:
+            param["model_seed"] = model_seed
+        if texture_seed is not None:
+            param["texture_seed"] = texture_seed
         response = self._submit_task(
-            "image_to_model", 
-            {
-                "file": {
-                    "type": "jpg",
-                    "file_token": image_token
-                }
-            },
+            "image_to_model",
+            param,
             start_time)
         return self._handle_task_response(response, start_time)
 
-    def multiview_to_3d(self, image_names, mode):
+    def multiview_to_3d(self, image_names, mode, multiview_orth_proj, model_seed):
         start_time = time.time()
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
-        }
         image_tokens = []
         for image_name in image_names:
             image_token = self.upload(image_name)
             if isinstance(image_token, dict):
                 return image_token
             image_tokens.append(image_token)
-
+        param = {
+            "files": [
+                {"type": "jpg", "file_token": image_tokens[0]},
+                {"type": "jpg", "file_token": image_tokens[1]},
+                {"type": "jpg", "file_token": image_tokens[2]}
+            ],
+            "mode": mode
+        }
+        if multiview_orth_proj is not None:
+            param["orthographic_projection"] = multiview_orth_proj
+        if model_seed is not None:
+            param["model_seed"] = model_seed
         response = self._submit_task(
             "multiview_to_model",
-            {
-                "files": [
-                    {"type": "jpg", "file_token": image_tokens[0]},
-                    {"type": "jpg", "file_token": image_tokens[1]},
-                    {"type": "jpg", "file_token": image_tokens[2]}
-                ],
-                "mode": mode
-            },
+            param,
             start_time)
         return self._handle_task_response(response, start_time)
 
@@ -170,22 +189,30 @@ class TripoAPI:
         return response
 
     async def _receive_one(self, task_id=None):
-        uri = f'wss://api.tripo3d.ai/v2/openapi/task/watch/{task_id}'
+        uri = f'wss://{tripo_base_url}/task/watch/{task_id}'
         headers = {
             "Authorization": f"Bearer {self.api_key}"
         }
         data = None
-        async with websockets.connect(uri, extra_headers=headers) as websocket:
-            while True:
-                message = await websocket.recv()
-                try:
-                    data = json.loads(message)
-                    status = data['data']['status']
-                    if status not in ['running', 'queued']:
-                        break
-                except json.JSONDecodeError:
-                    print("Received non-JSON message:", message)
-                    break
+        while True:
+            try:
+                async with websockets.connect(uri, extra_headers=headers) as websocket:
+                    while True:
+                        message = await websocket.recv()
+                        try:
+                            data = json.loads(message)
+                            status = data['data']['status']
+                            if status not in ['running', 'queued']:
+                                return data
+                        except json.JSONDecodeError:
+                            print("Received non-JSON message:", message)
+                            break
+            except websockets.exceptions.ConnectionClosedError as e:
+                print(f"Connection was closed: {e}")
+                await asyncio.sleep(1)  # Back-off before retrying
+            except Exception as e:
+                print(f"An error occurred: {e}")
+                break
         return data
 
     def _handle_task_response(self, response, start_time):
@@ -196,7 +223,7 @@ class TripoAPI:
             status = result['data']['status']
             if status == 'success':
                 print("Task completed successfully.")
-                return self._download_model(result['data']['output']['model'], task_id)
+                return self._download_model(result['data']['output'], task_id)
             else:
                 print(f"Task did not complete successfully. Status: {status}")
                 return {'status': status, 'message': 'Task did not complete successfully', 'task_id': task_id}
@@ -208,6 +235,10 @@ class TripoAPI:
             }
 
     def _download_model(self, model_url, task_id):
+        for name in ["model", "pbr_model"]:
+            if name in model_url:
+                model_url = model_url[name]
+                break
         print(f"Downloading model: {model_url}")
         response = requests.get(model_url)
         if response.status_code == 200:

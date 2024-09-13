@@ -70,6 +70,11 @@ class TripoAPIDraft:
                 "image_lr": ("IMAGE",),
                 "image_back": ("IMAGE",),
                 "multiview_mode": (["LEFT", "RIGHT"],),
+                "multiview_orth_proj": ("BOOLEAN", {"default": False}),
+                "model_version": (["v1.4-20240625", "v2.0-20240919"],),
+                "image_seed": ("INT",),
+                "model_seed": ("INT",),
+                "texture_seed": ("INT",),
             }
         }
         # if not tripo_api_key:
@@ -83,18 +88,20 @@ class TripoAPIDraft:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, mode, prompt=None, image=None, image_lr=None, image_back=None, multiview_mode=None, apikey=None):
+    def generate_mesh(self, mode, prompt=None, image=None, image_lr=None, image_back=None,
+                      multiview_mode=None, multiview_orth_proj=None, apikey=None, model_version=None,
+                      image_seed=None, model_seed=None, texture_seed=None):
         api, key = GetTripoAPI(apikey)
 
         if mode == "text_to_model":
             if not prompt:
                 raise RuntimeError("Prompt is required")
-            result = api.text_to_3d(prompt)
+            result = api.text_to_3d(prompt, model_version, image_seed, model_seed, texture_seed)
         elif mode == 'image_to_model':
             if image is None:
                 raise RuntimeError("Image is required")
             image_name = save_tensor(image, os.path.join(get_output_directory(), "image"))
-            result = api.image_to_3d(image_name)
+            result = api.image_to_3d(image_name, model_version, model_seed, texture_seed)
         elif mode == 'multiview_to_model':
             if image is None or image_lr is None or image_back is None:
                 raise RuntimeError("Multiview images are required")
@@ -104,7 +111,7 @@ class TripoAPIDraft:
             image_lr = save_tensor(image_lr, os.path.join(get_output_directory(), "image_lr"))
             image_back = save_tensor(image_back, os.path.join(get_output_directory(), "image_back"))
             image_names = [image_front, image_lr, image_back]
-            result = api.multiview_to_3d(image_names, multiview_mode)
+            result = api.multiview_to_3d(image_names, multiview_mode, multiview_orth_proj, model_seed)
         if result['status'] == 'success':
             return ([result['model']], result['task_id'], key)
         else:
