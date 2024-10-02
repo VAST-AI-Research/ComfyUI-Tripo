@@ -18,6 +18,7 @@ class Visualizer {
   }
 
   updateVisual(params) {
+    console.log(params)
     this.model_viewer.src = api
       .apiURL("/view?" + new URLSearchParams(params))
       .replace(/extensions.*\//, "");
@@ -72,7 +73,6 @@ function createVisualizer(node, inputName, typeName, inputData, app) {
       if (this.model_viewer != null) {
         this.model_viewer.style.width = this.visualizer.style.width;
         this.model_viewer.style.height = this.visualizer.style.height;
-        console.log(this.model_viewer.getCameraOrbit());
       }
       this.visualizer.hidden = !visible;
     },

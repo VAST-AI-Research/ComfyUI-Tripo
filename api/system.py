@@ -188,7 +188,7 @@ class TripoAPI:
         )
         return response
 
-    async def _receive_one(self, task_id=None):
+    async def _receive_one(self, task_id='all'):
         uri = f'wss://{tripo_base_url}/task/watch/{task_id}'
         headers = {
             "Authorization": f"Bearer {self.api_key}"
@@ -219,7 +219,7 @@ class TripoAPI:
         if response.status_code == 200:
             task_id = response.json()['data']['task_id']
             print(f"Task ID: {task_id}")
-            result = asyncio.run(self._receive_one(task_id))
+            result = asyncio.run(self._receive_one())
             status = result['data']['status']
             if status == 'success':
                 print("Task completed successfully.")

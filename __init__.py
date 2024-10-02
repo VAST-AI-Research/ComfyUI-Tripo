@@ -36,25 +36,21 @@ class TripoGLBViewer:
     CATEGORY = "TripoAPI"
 
     def display(self, mesh):
-        saved = []
         full_output_folder, filename, counter, subfolder, filename_prefix = get_save_image_path(
             "meshsave", get_output_directory())
-        for (batch_number, single_mesh) in enumerate(mesh):
-            filename_with_batch_num = filename.replace(
-                "%batch_num%", str(batch_number))
-            file = f"{filename_with_batch_num}_{counter:05}_.glb"
+        file = f"mesh_{counter:05}_.glb"
 
-            # Write the GLB content directly to a new file
-            with open(path.join(full_output_folder, file), "wb") as f:
-                f.write(single_mesh)
-            print(f"Saved GLB file to {full_output_folder}/{file}")
-            saved.append({
-                "filename": file,
-                "type": "output",
-                "subfolder": subfolder
-            })
+        # Write the GLB content directly to a new file
+        with open(path.join(full_output_folder, file), "wb") as f:
+            f.write(mesh)
+        print(f"Saved GLB file to {full_output_folder}/{file}")
+        saved = {
+            "filename": file,
+            "type": "output",
+            "subfolder": subfolder
+        }
 
-            return {"ui": {"mesh": saved}}
+        return {"ui": {"mesh": [saved]}}
 
 
 class TripoAPIDraft:
@@ -113,7 +109,7 @@ class TripoAPIDraft:
             image_names = [image_front, image_lr, image_back]
             result = api.multiview_to_3d(image_names, multiview_mode, multiview_orth_proj, model_seed)
         if result['status'] == 'success':
-            return ([result['model']], result['task_id'], key)
+            return (result['model'], result['task_id'], key)
         else:
             raise RuntimeError(f"Failed to generate mesh: {result['message']}")
 
@@ -139,7 +135,7 @@ class TripoRefineModel:
         api, key = GetTripoAPI(apikey)
         result = api.refine_draft(model_task_id)
         if result['status'] == 'success':
-            return ([result['model']], result['task_id'])
+            return (result['model'], result['task_id'])
         else:
             raise RuntimeError(f"Failed to generate mesh: {result['message']}")
 
@@ -165,7 +161,7 @@ class TripoAnimateRigNode:
         api, key = GetTripoAPI(apikey)
         result = api.animate_rig(original_model_task_id)
         if result['status'] == 'success':
-            return ([result['model']], result['task_id'])
+            return (result['model'], result['task_id'])
         else:
             raise RuntimeError(f"Failed to generate mesh: {result['message']}")
 
@@ -194,7 +190,7 @@ class TripoAnimateRetargetNode:
         api, key = GetTripoAPI(apikey)
         result = api.animate_retarget(original_model_task_id, animation)
         if result['status'] == 'success':
-            return ([result['model']])
+            return (result['model'],)
         else:
             raise RuntimeError(f"Failed to generate mesh: {result['message']}")
 
