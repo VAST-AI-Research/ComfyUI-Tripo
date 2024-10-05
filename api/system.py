@@ -5,6 +5,7 @@ from PIL import Image
 import asyncio
 import websockets
 import json
+import traceback
 
 def save_tensor(image_tensor, filename):
     # Assuming the first dimension is the batch size, select the first image
@@ -212,6 +213,7 @@ class TripoAPI:
                 await asyncio.sleep(1)  # Back-off before retrying
             except Exception as e:
                 print(f"An error occurred: {e}")
+                traceback.print_exc()
                 break
         return data
 
