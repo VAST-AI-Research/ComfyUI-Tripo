@@ -2,10 +2,10 @@ import sys
 from os import path
 import os
 import json
+from folder_paths import get_output_directory
 sys.path.insert(0, path.dirname(__file__))
 
 from api.system import TripoAPI, save_tensor
-from folder_paths import get_save_image_path, get_output_directory
 
 tripo_api_key = os.environ.get("TRIPO_API_KEY")
 if not tripo_api_key:
@@ -25,7 +25,6 @@ class TripoGLBViewer:
     def INPUT_TYPES(s):
         return {
             "required": {
-                # MESH_GLB is a custom type that represents a GLB file
                 "mesh": ("MESH",)
             }
         }
@@ -36,18 +35,10 @@ class TripoGLBViewer:
     CATEGORY = "TripoAPI"
 
     def display(self, mesh):
-        full_output_folder, filename, counter, subfolder, filename_prefix = get_save_image_path(
-            "meshsave", get_output_directory())
-        file = f"mesh_{counter:05}_.glb"
-
-        # Write the GLB content directly to a new file
-        with open(path.join(full_output_folder, file), "wb") as f:
-            f.write(mesh)
-        print(f"Saved GLB file to {full_output_folder}/{file}")
         saved = {
-            "filename": file,
+            "filename": mesh["filename"],
             "type": "output",
-            "subfolder": subfolder
+            "subfolder": mesh["sub_folder"]
         }
 
         return {"ui": {"mesh": [saved]}}
@@ -130,8 +121,8 @@ class TripoRefineModel:
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, model_task_id, apikey=None):
-        if not model_task_id:
-            raise RuntimeError("original_model_task_id is required")
+        # if not model_task_id:
+        #     raise RuntimeError("original_model_task_id is required")
         api, key = GetTripoAPI(apikey)
         result = api.refine_draft(model_task_id)
         if result['status'] == 'success':
@@ -156,8 +147,8 @@ class TripoAnimateRigNode:
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, original_model_task_id, apikey=None):
-        if original_model_task_id is None or original_model_task_id == "":
-            raise RuntimeError("original_model_task_id is required")
+        # if original_model_task_id is None or original_model_task_id == "":
+        #     raise RuntimeError("original_model_task_id is required")
         api, key = GetTripoAPI(apikey)
         result = api.animate_rig(original_model_task_id)
         if result['status'] == 'success':
@@ -178,17 +169,59 @@ class TripoAnimateRetargetNode:
             config["required"]["apikey"] = ("API_KEY",)
         return config
 
-    RETURN_TYPES = ("MESH",)
+    RETURN_TYPES = ("MESH", "RETARGET_TASK_ID")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, animation, original_model_task_id, apikey=None):
-        if not original_model_task_id:
-            raise RuntimeError("original_model_task_id is required")
-        if not animation:
-            raise RuntimeError("Animation is required")
+        # if not original_model_task_id:
+        #     raise RuntimeError("original_model_task_id is required")
+        # if not animation:
+        #     raise RuntimeError("Animation is required")
         api, key = GetTripoAPI(apikey)
         result = api.animate_retarget(original_model_task_id, animation)
+        if result['status'] == 'success':
+            return (result['model'],)
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+
+class TripoConvertNode:
+    @classmethod
+    def INPUT_TYPES(s):
+        config = {
+            "required": {
+                "original_model_task_id": ("MODEL_TASK_ID,RIG_TASK_ID,RETARGET_TASK_ID",),
+                "format": (["GLTF", "USDZ", "FBX", "OBJ", "STL", "3MF"],),
+            },
+            "optional": {
+                "quad": ("BOOLEAN", {"default": False}),
+                "face_limit": ("INT", {"min": 0, "max": 50000, "default": 10000}),
+                "texture_size": ("INT", {"min": 128, "max": 4096, "default": 4096}),
+                "texture_format": (["BMP", "DPX", "HDR", "JPEG", "OPEN_EXR", "PNG", "TARGA", "TIFF", "WEBP"], {"default": "JPEG"})
+            }
+        }
+        if not tripo_api_key:
+            config["required"]["apikey"] = ("API_KEY",)
+        return config
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, input_types):
+        # The min and max of input1 and input2 are still validated because
+        # we didn't take `input1` or `input2` as arguments
+        if input_types["original_model_task_id"] not in ("MODEL_TASK_ID", "RIG_TASK_ID", "RETARGET_TASK_ID"):
+            return "original_model_task_id must be MODEL_TASK_ID, RIG_TASK_ID or RETARGET_TASK_ID type"
+        return True
+
+    RETURN_TYPES = ()
+    OUTPUT_NODE = True
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    def generate_mesh(self, original_model_task_id, format, quad, face_limit, texture_size, texture_format, apikey=None):
+        if not original_model_task_id:
+            raise RuntimeError("original_model_task_id is required")
+        api, key = GetTripoAPI(apikey)
+        result = api.convert(original_model_task_id, format, quad, face_limit, texture_size, texture_format)
         if result['status'] == 'success':
             return (result['model'],)
         else:
@@ -199,6 +232,7 @@ NODE_CLASS_MAPPINGS = {
     "TripoRefineModel": TripoRefineModel,
     "TripoAnimateRigNode": TripoAnimateRigNode,
     "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
+    "TripoConvertNode": TripoConvertNode,
     "TripoGLBViewer": TripoGLBViewer,
 }
 
@@ -207,6 +241,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoRefineModel": "Tripo: Refine Draft model",
     "TripoAnimateRigNode": "Tripo: Rig Draft model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
+    "TripoConvertNode": "Tripo: Convert model",
     "TripoGLBViewer": "Tripo: GLB Viewer",
 }
 

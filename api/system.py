@@ -1,11 +1,13 @@
 import requests
 import time
 import torch
+import os
 from PIL import Image
 import asyncio
 import websockets
 import json
 import traceback
+from folder_paths import get_output_directory
 
 def save_tensor(image_tensor, filename):
     # Assuming the first dimension is the batch size, select the first image
@@ -162,6 +164,21 @@ class TripoAPI:
             start_time)
         return self._handle_task_response(response, start_time)
 
+    def convert(self, original_model_task_id, format, quad, face_limit, texture_size, texture_format):
+        start_time = time.time()
+        response = self._submit_task(
+            "convert_model",
+            {
+                "original_model_task_id": original_model_task_id,
+                "format": format,
+                "quad": quad,
+                "face_limit": face_limit,
+                "texture_size": texture_size,
+                "texture_format": texture_format,
+            },
+            start_time)
+        return self._handle_task_response(response, start_time)
+
     def _submit_task(self, task_type, task_payload, start_time):
         if time.time() - start_time > self.timeout:
             return {'status': 'error', 'message': 'Operation timed out', 'task_id': None}
@@ -244,6 +261,18 @@ class TripoAPI:
         print(f"Downloading model: {model_url}")
         response = requests.get(model_url)
         if response.status_code == 200:
-            return {'status': 'success', 'model': response.content, 'task_id': task_id}
+            subfolder = get_output_directory()
+            postfix_index = model_url.find('?auth_key')
+            assert postfix_index > 0
+            model_url = model_url[:postfix_index]
+            postfix_index = model_url.rfind('/')
+            assert postfix_index > 0
+            file = f"{model_url[postfix_index+1:]}"
+
+            # Write the GLB content directly to a new file
+            with open(os.path.join(subfolder, file), "wb") as f:
+                f.write(response.content)
+            print(f"Saved GLB file to {subfolder}/{file}")
+            return {'status': 'success', 'model': {"sub_folder": subfolder, "filename": file}, 'task_id': task_id}
         else:
             return {'status': 'error', 'message': 'Failed to download model', 'task_id': task_id}
