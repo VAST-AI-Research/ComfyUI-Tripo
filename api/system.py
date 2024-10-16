@@ -223,14 +223,14 @@ class TripoAPI:
                             if status not in ['running', 'queued']:
                                 return data
                         except json.JSONDecodeError:
-                            print("Received non-JSON message:", message)
+                            data = f"Received non-JSON message: {message}"
                             break
             except websockets.exceptions.ConnectionClosedError as e:
-                print(f"Connection was closed: {e}")
+                data = f"Connection was closed: {e}"
                 await asyncio.sleep(1)  # Back-off before retrying
             except Exception as e:
-                print(f"An error occurred: {e}")
-                traceback.print_exc()
+                data = f"An error occurred: {e}"
+                # traceback.print_exc()
                 break
         return data
 
@@ -239,6 +239,8 @@ class TripoAPI:
             task_id = response.json()['data']['task_id']
             print(f"Task ID: {task_id}")
             result = asyncio.run(self._receive_one())
+            if isinstance(result, str):
+                raise Exception(result)
             status = result['data']['status']
             if status == 'success':
                 print("Task completed successfully.")
