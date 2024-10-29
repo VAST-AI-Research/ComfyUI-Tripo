@@ -59,9 +59,9 @@ class TripoAPIDraft:
                 "multiview_mode": (["LEFT", "RIGHT"],),
                 "multiview_orth_proj": ("BOOLEAN", {"default": False}),
                 "model_version": (["v1.4-20240625", "v2.0-20240919"],),
-                "image_seed": ("INT",),
-                "model_seed": ("INT",),
-                "texture_seed": ("INT",),
+                "image_seed": ("INT", {"default": 42}),
+                "model_seed": ("INT", {"default": 42}),
+                "texture_seed": ("INT", {"default": 42}),
             }
         }
         # if not tripo_api_key:
