@@ -2,7 +2,7 @@ import sys
 from os import path
 import os
 import json
-from folder_paths import get_output_directory
+from folder_paths import get_input_directory
 sys.path.insert(0, path.dirname(__file__))
 
 from api.system import TripoAPI, save_tensor
@@ -59,9 +59,9 @@ class TripoAPIDraft:
                 "image_right": ("IMAGE",),
                 "multiview_orth_proj": ("BOOLEAN", {"default": False}),
                 "model_version": (["v1.4-20240625", "v2.0-20240919"], {"default": "v2.0-20240919"}),
-                "style": (["person:person2cartoon", "animal:venom", "object:clay", "object:steampunk"], {"default": None}),
-                "texture": {"BOOLEAN", {"default": True}},
-                "pbr": {"BOOLEAN", {"default": True}},
+                "style": (["person:person2cartoon", "animal:venom", "object:clay", "object:steampunk", "None"], {"default": "None"}),
+                "texture": ("BOOLEAN", {"default": True}),
+                "pbr": ("BOOLEAN", {"default": True}),
                 "image_seed": ("INT", {"default": 42}),
                 "model_seed": ("INT", {"default": 42}),
                 "texture_seed": ("INT", {"default": 42}),
@@ -92,7 +92,7 @@ class TripoAPIDraft:
         elif mode == 'image_to_model':
             if image is None:
                 raise RuntimeError("Image is required")
-            image_name = save_tensor(image, os.path.join(get_output_directory(), "image"))
+            image_name = save_tensor(image, os.path.join(get_input_directory(), "image"))
             result = api.image_to_3d(image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment)
         elif mode == 'multiview_to_model':
             if image is None:
@@ -111,10 +111,10 @@ class TripoAPIDraft:
                 if image_back is None:
                     raise RuntimeError("back image for multiview 1.4 is required")
             image_names = []
-            for image_name in ["image", "image_left", "image_right", "image_back"]:
+            for image_name in ["image", "image_left", "image_back", "image_right"]:
                 image_ = locals()[image_name]
                 if image_ is not None:
-                    image_filename = save_tensor(image, os.path.join(get_output_directory(), image_name))
+                    image_filename = save_tensor(image_, os.path.join(get_input_directory(), image_name))
                     image_names.append(image_filename)
                 else:
                     image_names.append(None)
@@ -132,8 +132,8 @@ class TripoTextureModel:
                 "model_task_id": ("MODEL_TASK_ID",),
             },
             "optional": {
-                "texture": {"BOOLEAN", {"default": True}},
-                "pbr": {"BOOLEAN", {"default": True}},
+                "texture": ("BOOLEAN", {"default": True}),
+                "pbr": ("BOOLEAN", {"default": True}),
                 "texture_seed": ("INT", {"default": 42}),
                 "texture_quality": (["standard", "detailed"], {"default": "standard"}),
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
@@ -282,6 +282,7 @@ class TripoConvertNode:
 
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
+    "TripoTextureModel": TripoTextureModel,
     "TripoRefineModel": TripoRefineModel,
     "TripoAnimateRigNode": TripoAnimateRigNode,
     "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
@@ -290,9 +291,10 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TripoAPIDraft": "Tripo: Generate Draft model",
+    "TripoAPIDraft": "Tripo: Generate model",
+    "TripoTextureModel": "Tripo: Texture model",
     "TripoRefineModel": "Tripo: Refine Draft model",
-    "TripoAnimateRigNode": "Tripo: Rig Draft model",
+    "TripoAnimateRigNode": "Tripo: Rig model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
     "TripoConvertNode": "Tripo: Convert model",
     "TripoGLBViewer": "Tripo: GLB Viewer",

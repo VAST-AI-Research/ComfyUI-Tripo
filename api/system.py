@@ -101,6 +101,8 @@ class TripoAPI:
             _param = locals()[param_name]
             if _param is not None:
                 param[param_name] = _param
+        if "style" in param and param["style"] == 'None':
+            del param["style"]
         response = self._submit_task(
             "image_to_model",
             param,
@@ -117,7 +119,7 @@ class TripoAPI:
                     return image_token
                 image_tokens.append(image_token)
             else:
-                image_tokens.append("")
+                image_tokens.append(None)
         if model_version is not None and model_version.startswith("v2"):
             param = {"files":[]}
             for image_token in image_tokens:
@@ -213,12 +215,6 @@ class TripoAPI:
         print(f"Submitting task: {task_type}")
         if 'prompt' in task_payload:
             print(f"Task prompt: {task_payload['prompt']}")
-        if 'file' in task_payload:
-            print(f"Task file type: {task_payload['file']['type']}")
-        if 'files' in task_payload:
-            print(task_payload)
-            print(f"Task files type: {task_payload['files'][0]['type']},\n"  # Assume all views are of the same type
-                  f"Task mode: {task_payload['mode']}")
         if 'draft_model_task_id' in task_payload:
             print(f"Task draft model task ID: {task_payload['draft_model_task_id']}")
         if 'original_model_task_id' in task_payload and 'animation' not in task_payload:
@@ -284,7 +280,7 @@ class TripoAPI:
             }
 
     def _download_model(self, model_url, task_id):
-        for name in ["model", "pbr_model"]:
+        for name in ["pbr_model", "model", "base_model"]:
             if name in model_url:
                 model_url = model_url[name]
                 break
