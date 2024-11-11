@@ -2,12 +2,15 @@
 This extension integrates Tripo into ComfyUI, allowing users to generate 3D models from text prompts or images directly within the ComfyUI interface.
 
 ## ChangeLog
+- 20241111: adapt for new api
 - 20241014: support convert
 - 20240913: support model_version v2.0-20240919
 
 ## Features
-- Generate 3D models from text prompts using the Tripo API
-- Generate 3D models from images using the Tripo API
+- Generate 3D models from text prompts
+- Generate 3D models from images
+- Animate 3d models
+- Convert format and retopologize
 - View generated 3D models directly in ComfyUI using the TripoGLB Viewer node
 
 ## Installation
@@ -47,23 +50,27 @@ Load the png sceenshot in comyfui by dragging or loading manually.
 ### Text to Mesh
 ![img](workflows/text_to_model.png)
 
-This node allows you to generate a 3D model from a text prompt using the Tripo API.
+This node allows you to generate a 3D model from a text prompt.
 
 ### Image to Mesh
 ![img](workflows/image_to_model.png)
-This node allows you to generate a 3D model from an input image using the Tripo API.
+This node allows you to generate a 3D model from an input image.
 
 ### Multiview Images to Mesh
 ![img](workflows/multiview_to_model.png)
-This node allows you to generate a 3D model from three multiview input images using the Tripo API.
+This node allows you to generate a 3D model from three multiview input images.
+
+### Texture a generated model
+![img](workflows/texture_model.png)
+This node allows you to generate texture and pbr for a generated 3D model.
 
 ### Refine a draft Mesh
 ![img](workflows/refine_model.png)
-This node allows you to refine a 3D model from a draft model using the Tripo API.
+This node allows you to refine a 3D model from a draft model.
 
 ### Animation
 ![img](workflows/retarget.png)
-This node allows you to generate a 3D model with skeleton and animation using the Tripo API.
+This node allows you to generate a 3D model with skeleton and animation.
 
 
 ### Download Model

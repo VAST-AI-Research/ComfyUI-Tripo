@@ -70,27 +70,23 @@ class TripoAPI:
                 'message': response.json().get('message', 'An unexpected error occurred'),
                 'task_id': None
                 }
-        
-    def text_to_3d(self, prompt, model_version, image_seed, model_seed, texture_seed):
+
+    def text_to_3d(self, prompt, model_version, texture, pbr, image_seed, model_seed, texture_seed, texture_quality):
         start_time = time.time()
         param = {
             "prompt": prompt
         }
-        if model_version is not None:
-            param["model_version"] = model_version
-        if image_seed is not None:
-            param["image_seed"] = image_seed
-        if model_seed is not None:
-            param["model_seed"] = model_seed
-        if texture_seed is not None:
-            param["texture_seed"] = texture_seed
+        for param_name in ["model_version", "texture", "pbr", "image_seed", "model_seed", "texture_seed", "texture_quality"]:
+            _param = locals()[param_name]
+            if _param is not None:
+                param[param_name] = _param
         response = self._submit_task(
             "text_to_model",
             param,
             start_time)
         return self._handle_task_response(response, start_time)
 
-    def image_to_3d(self, image_name, model_version, model_seed, texture_seed):
+    def image_to_3d(self, image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment):
         start_time = time.time()
         image_token = self.upload(image_name)
         if isinstance(image_token, dict):
@@ -101,38 +97,59 @@ class TripoAPI:
                 "file_token": image_token
             }
         }
-        if model_version is not None:
-            param["model_version"] = model_version
-        if model_seed is not None:
-            param["model_seed"] = model_seed
-        if texture_seed is not None:
-            param["texture_seed"] = texture_seed
+        for param_name in ["model_version", "style", "texture", "pbr", "model_seed", "texture_seed", "texture_quality", "texture_alignment"]:
+            _param = locals()[param_name]
+            if _param is not None:
+                param[param_name] = _param
+        if "style" in param and param["style"] == 'None':
+            del param["style"]
         response = self._submit_task(
             "image_to_model",
             param,
             start_time)
         return self._handle_task_response(response, start_time)
 
-    def multiview_to_3d(self, image_names, mode, multiview_orth_proj, model_seed):
+    def multiview_to_3d(self, image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment):
         start_time = time.time()
         image_tokens = []
         for image_name in image_names:
-            image_token = self.upload(image_name)
-            if isinstance(image_token, dict):
-                return image_token
-            image_tokens.append(image_token)
-        param = {
-            "files": [
-                {"type": "jpg", "file_token": image_tokens[0]},
-                {"type": "jpg", "file_token": image_tokens[1]},
-                {"type": "jpg", "file_token": image_tokens[2]}
-            ],
-            "mode": mode
-        }
-        if multiview_orth_proj is not None:
-            param["orthographic_projection"] = multiview_orth_proj
-        if model_seed is not None:
-            param["model_seed"] = model_seed
+            if image_name:
+                image_token = self.upload(image_name)
+                if isinstance(image_token, dict):
+                    return image_token
+                image_tokens.append(image_token)
+            else:
+                image_tokens.append(None)
+        if model_version is not None and model_version.startswith("v2"):
+            param = {"files":[]}
+            for image_token in image_tokens:
+                param["files"].append({"type": "jpg", "file_token": image_token})
+            for param_name in ["texture", "pbr", "texture_seed", "texture_quality", "texture_alignment"]:
+                _param = locals()[param_name]
+                if _param is not None:
+                    param[param_name] = _param
+        else:
+            if image_tokens[1]:
+                mode = "LEFT"
+                index = 1
+            else:
+                mode = "RIGHT"
+                index = 3
+            param = {
+                "files": [
+                    {"type": "jpg", "file_token": image_tokens[0]},
+                    {"type": "jpg", "file_token": image_tokens[index]},
+                    {"type": "jpg", "file_token": image_tokens[2]}
+                ],
+                "mode": mode
+            }
+            if multiview_orth_proj is not None:
+                param["orthographic_projection"] = multiview_orth_proj
+
+        for param_name in ["model_seed", "model_version"]:
+            _param = locals()[param_name]
+            if _param is not None:
+                param[param_name] = _param
         response = self._submit_task(
             "multiview_to_model",
             param,
@@ -144,6 +161,19 @@ class TripoAPI:
         response = self._submit_task(
             "refine_model",
             {"draft_model_task_id": draft_model_task_id},
+            start_time)
+        return self._handle_task_response(response, start_time)
+
+    def texture(self, original_model_task_id, texture, pbr, texture_seed, texture_quality, texture_alignment):
+        start_time = time.time()
+        param = {"original_model_task_id": original_model_task_id}
+        for param_name in ["texture", "pbr", "texture_seed", "texture_quality", "texture_alignment"]:
+            _param = locals()[param_name]
+            if _param is not None:
+                param[param_name] = _param
+        response = self._submit_task(
+            "texture_model",
+            param,
             start_time)
         return self._handle_task_response(response, start_time)
 
@@ -185,12 +215,6 @@ class TripoAPI:
         print(f"Submitting task: {task_type}")
         if 'prompt' in task_payload:
             print(f"Task prompt: {task_payload['prompt']}")
-        if 'file' in task_payload:
-            print(f"Task file type: {task_payload['file']['type']}")
-        if 'files' in task_payload:
-            print(task_payload)
-            print(f"Task files type: {task_payload['files'][0]['type']},\n"  # Assume all views are of the same type
-                  f"Task mode: {task_payload['mode']}")
         if 'draft_model_task_id' in task_payload:
             print(f"Task draft model task ID: {task_payload['draft_model_task_id']}")
         if 'original_model_task_id' in task_payload and 'animation' not in task_payload:
@@ -256,7 +280,7 @@ class TripoAPI:
             }
 
     def _download_model(self, model_url, task_id):
-        for name in ["model", "pbr_model"]:
+        for name in ["pbr_model", "model", "base_model"]:
             if name in model_url:
                 model_url = model_url[name]
                 break
