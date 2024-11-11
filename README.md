@@ -9,6 +9,8 @@ This extension integrates Tripo into ComfyUI, allowing users to generate 3D mode
 ## Features
 - Generate 3D models from text prompts
 - Generate 3D models from images
+- Animate 3d models
+- Convert format and retopologize
 - View generated 3D models directly in ComfyUI using the TripoGLB Viewer node
 
 ## Installation
