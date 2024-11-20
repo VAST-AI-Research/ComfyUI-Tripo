@@ -7,6 +7,7 @@ import asyncio
 import websockets
 import json
 import traceback
+import inspect
 from folder_paths import get_output_directory
 
 def save_tensor(image_tensor, filename):
@@ -236,9 +237,12 @@ class TripoAPI:
             "Authorization": f"Bearer {self.api_key}"
         }
         data = None
+        signature = inspect.signature(websockets.connect)
+        key = "extra_headers" if 'extra_headers' in signature.parameters else "additional_headers"
+        headers = {key: headers}
         while True:
             try:
-                async with websockets.connect(uri, extra_headers=headers) as websocket:
+                async with websockets.connect(uri, **headers) as websocket:
                     while True:
                         message = await websocket.recv()
                         try:
