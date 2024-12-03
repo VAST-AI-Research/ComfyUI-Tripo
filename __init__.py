@@ -67,7 +67,7 @@ class TripoAPIDraft:
                 "texture_seed": ("INT", {"default": 42}),
                 "texture_quality": (["standard", "detailed"], {"default": "standard"}),
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
-                "face_limit": ("INT", {"default": -1}),
+                "face_limit": ("INT", {"min": -1, "max": 500000, "default": -1}),
             }
         }
         config["required"]["apikey"] = ("STRING", {"default": ""})
@@ -248,7 +248,7 @@ class TripoConvertNode:
             },
             "optional": {
                 "quad": ("BOOLEAN", {"default": False}),
-                "face_limit": ("INT", {"min": 0, "max": 50000, "default": 10000}),
+                "face_limit": ("INT", {"min": -1, "max": 500000, "default": -1}),
                 "texture_size": ("INT", {"min": 128, "max": 4096, "default": 4096}),
                 "texture_format": (["BMP", "DPX", "HDR", "JPEG", "OPEN_EXR", "PNG", "TARGA", "TIFF", "WEBP"], {"default": "JPEG"})
             }

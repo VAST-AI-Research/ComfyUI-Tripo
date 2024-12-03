@@ -266,7 +266,7 @@ class TripoAPI:
         if response.status_code == 200:
             task_id = response.json()['data']['task_id']
             print(f"Task ID: {task_id}")
-            result = asyncio.run(self._receive_one())
+            result = asyncio.run(self._receive_one(task_id))
             if isinstance(result, str):
                 raise Exception(result)
             status = result['data']['status']
