@@ -67,9 +67,9 @@ class TripoAPIDraft:
                 "texture_seed": ("INT", {"default": 42}),
                 "texture_quality": (["standard", "detailed"], {"default": "standard"}),
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
+                "face_limit": ("INT", {"default": -1}),
             }
         }
-        # if not tripo_api_key:
         config["required"]["apikey"] = ("STRING", {"default": ""})
         return config
 
@@ -82,18 +82,18 @@ class TripoAPIDraft:
 
     def generate_mesh(self, mode, prompt=None, image=None, image_left=None, image_back=None, image_right=None,
                       multiview_orth_proj=None, apikey=None, model_version=None, texture=None, pbr=None, style=None,
-                      image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None):
+                      image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None, face_limit=None):
         api, key = GetTripoAPI(apikey)
 
         if mode == "text_to_model":
             if not prompt:
                 raise RuntimeError("Prompt is required")
-            result = api.text_to_3d(prompt, model_version, texture, pbr, image_seed, model_seed, texture_seed, texture_quality)
+            result = api.text_to_3d(prompt, model_version, texture, pbr, image_seed, model_seed, texture_seed, texture_quality, face_limit)
         elif mode == 'image_to_model':
             if image is None:
                 raise RuntimeError("Image is required")
             image_name = save_tensor(image, os.path.join(get_input_directory(), "image"))
-            result = api.image_to_3d(image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment)
+            result = api.image_to_3d(image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment, face_limit)
         elif mode == 'multiview_to_model':
             if image is None:
                 raise RuntimeError("front image for multiview is required")
@@ -118,7 +118,7 @@ class TripoAPIDraft:
                     image_names.append(image_filename)
                 else:
                     image_names.append(None)
-            result = api.multiview_to_3d(image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment)
+            result = api.multiview_to_3d(image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment, face_limit)
         if result['status'] == 'success':
             return (result['model'], result['task_id'], key)
         else:

@@ -72,12 +72,12 @@ class TripoAPI:
                 'task_id': None
                 }
 
-    def text_to_3d(self, prompt, model_version, texture, pbr, image_seed, model_seed, texture_seed, texture_quality):
+    def text_to_3d(self, prompt, model_version, texture, pbr, image_seed, model_seed, texture_seed, texture_quality, face_limit):
         start_time = time.time()
         param = {
             "prompt": prompt
         }
-        for param_name in ["model_version", "texture", "pbr", "image_seed", "model_seed", "texture_seed", "texture_quality"]:
+        for param_name in ["model_version", "texture", "pbr", "image_seed", "model_seed", "texture_seed", "texture_quality", "face_limit"]:
             _param = locals()[param_name]
             if _param is not None:
                 param[param_name] = _param
@@ -87,7 +87,7 @@ class TripoAPI:
             start_time)
         return self._handle_task_response(response, start_time)
 
-    def image_to_3d(self, image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment):
+    def image_to_3d(self, image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment, face_limit):
         start_time = time.time()
         image_token = self.upload(image_name)
         if isinstance(image_token, dict):
@@ -98,7 +98,7 @@ class TripoAPI:
                 "file_token": image_token
             }
         }
-        for param_name in ["model_version", "style", "texture", "pbr", "model_seed", "texture_seed", "texture_quality", "texture_alignment"]:
+        for param_name in ["model_version", "style", "texture", "pbr", "model_seed", "texture_seed", "texture_quality", "texture_alignment", "face_limit"]:
             _param = locals()[param_name]
             if _param is not None:
                 param[param_name] = _param
@@ -110,7 +110,7 @@ class TripoAPI:
             start_time)
         return self._handle_task_response(response, start_time)
 
-    def multiview_to_3d(self, image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment):
+    def multiview_to_3d(self, image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment, face_limit):
         start_time = time.time()
         image_tokens = []
         for image_name in image_names:
@@ -125,7 +125,7 @@ class TripoAPI:
             param = {"files":[]}
             for image_token in image_tokens:
                 param["files"].append({"type": "jpg", "file_token": image_token})
-            for param_name in ["texture", "pbr", "texture_seed", "texture_quality", "texture_alignment"]:
+            for param_name in ["texture", "pbr", "texture_seed", "texture_quality", "texture_alignment", "face_limit"]:
                 _param = locals()[param_name]
                 if _param is not None:
                     param[param_name] = _param
