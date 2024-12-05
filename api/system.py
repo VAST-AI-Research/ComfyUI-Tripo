@@ -258,15 +258,44 @@ class TripoAPI:
                 await asyncio.sleep(1)  # Back-off before retrying
             except Exception as e:
                 data = f"An error occurred: {e}"
-                # traceback.print_exc()
-                break
+                await asyncio.sleep(1)  # Back-off before retrying
         return data
+
+    def _poll_task_status(self, task_id, start_time):
+        last_progress = -1
+        while True:
+            if time.time() - start_time > self.timeout:
+                print("Operation timed out.")
+                return {'status': 'error', 'message': 'Operation timed out', 'task_id': task_id}
+
+            response = requests.get(
+                f"{self.api_url}/task/{task_id}",
+                headers={"Authorization": f"Bearer {self.api_key}"}
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                status = data['data']['status']
+                progress = data['data'].get('progress', 0)
+
+                # Print progress if it has changed.
+                if progress != last_progress:
+                    print(f"Task Progress: {progress}%")
+                    last_progress = progress
+
+                if status not in ['queued', 'running']:
+                    return data
+            else:
+                return "Failed to get task status."
+
+            time.sleep(self.polling_interval)  # Wait before polling again
 
     def _handle_task_response(self, response, start_time):
         if response.status_code == 200:
             task_id = response.json()['data']['task_id']
             print(f"Task ID: {task_id}")
-            result = asyncio.run(self._receive_one(task_id))
+            result = self._poll_task_status(task_id, start_time)
+            # result = asyncio.run(self._receive_one(task_id))
             if isinstance(result, str):
                 raise Exception(result)
             status = result['data']['status']
