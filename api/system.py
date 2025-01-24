@@ -72,12 +72,12 @@ class TripoAPI:
                 'task_id': None
                 }
 
-    def text_to_3d(self, prompt, model_version, texture, pbr, image_seed, model_seed, texture_seed, texture_quality, face_limit):
+    def text_to_3d(self, prompt, model_version, style, texture, pbr, image_seed, model_seed, texture_seed, texture_quality, face_limit, quad):
         start_time = time.time()
         param = {
             "prompt": prompt
         }
-        for param_name in ["model_version", "texture", "pbr", "image_seed", "model_seed", "texture_seed", "texture_quality", "face_limit"]:
+        for param_name in ["model_version", "style", "texture", "pbr", "image_seed", "model_seed", "texture_seed", "texture_quality", "face_limit", "quad"]:
             _param = locals()[param_name]
             if _param is not None:
                 param[param_name] = _param
@@ -87,7 +87,7 @@ class TripoAPI:
             start_time)
         return self._handle_task_response(response, start_time)
 
-    def image_to_3d(self, image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment, face_limit):
+    def image_to_3d(self, image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment, face_limit, quad):
         start_time = time.time()
         image_token = self.upload(image_name)
         if isinstance(image_token, dict):
@@ -98,7 +98,7 @@ class TripoAPI:
                 "file_token": image_token
             }
         }
-        for param_name in ["model_version", "style", "texture", "pbr", "model_seed", "texture_seed", "texture_quality", "texture_alignment", "face_limit"]:
+        for param_name in ["model_version", "style", "texture", "pbr", "model_seed", "texture_seed", "texture_quality", "texture_alignment", "face_limit", "quad"]:
             _param = locals()[param_name]
             if _param is not None:
                 param[param_name] = _param
@@ -110,7 +110,7 @@ class TripoAPI:
             start_time)
         return self._handle_task_response(response, start_time)
 
-    def multiview_to_3d(self, image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment, face_limit):
+    def multiview_to_3d(self, image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment, face_limit, quad):
         start_time = time.time()
         image_tokens = []
         for image_name in image_names:
@@ -125,27 +125,10 @@ class TripoAPI:
             param = {"files":[]}
             for image_token in image_tokens:
                 param["files"].append({"type": "jpg", "file_token": image_token})
-            for param_name in ["texture", "pbr", "texture_seed", "texture_quality", "texture_alignment", "face_limit"]:
+            for param_name in ["texture", "pbr", "texture_seed", "texture_quality", "texture_alignment", "face_limit", "quad"]:
                 _param = locals()[param_name]
                 if _param is not None:
                     param[param_name] = _param
-        else:
-            if image_tokens[1]:
-                mode = "LEFT"
-                index = 1
-            else:
-                mode = "RIGHT"
-                index = 3
-            param = {
-                "files": [
-                    {"type": "jpg", "file_token": image_tokens[0]},
-                    {"type": "jpg", "file_token": image_tokens[index]},
-                    {"type": "jpg", "file_token": image_tokens[2]}
-                ],
-                "mode": mode
-            }
-            if multiview_orth_proj is not None:
-                param["orthographic_projection"] = multiview_orth_proj
 
         for param_name in ["model_seed", "model_version"]:
             _param = locals()[param_name]
@@ -332,6 +315,6 @@ class TripoAPI:
             with open(os.path.join(subfolder, file), "wb") as f:
                 f.write(response.content)
             print(f"Saved GLB file to {subfolder}/{file}")
-            return {'status': 'success', 'model': {"sub_folder": subfolder, "filename": file}, 'task_id': task_id}
+            return {'status': 'success', 'model': os.path.join(subfolder, file), 'task_id': task_id}
         else:
             return {'status': 'error', 'message': 'Failed to download model', 'task_id': task_id}

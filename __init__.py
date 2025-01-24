@@ -25,7 +25,7 @@ class TripoGLBViewer:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "mesh": ("MESH",)
+                "mesh": ("STRING",)
             }
         }
 
@@ -57,9 +57,9 @@ class TripoAPIDraft:
                 "image_left": ("IMAGE",),
                 "image_back": ("IMAGE",),
                 "image_right": ("IMAGE",),
-                "multiview_orth_proj": ("BOOLEAN", {"default": False}),
-                "model_version": (["v1.4-20240625", "v2.0-20240919"], {"default": "v2.0-20240919"}),
-                "style": (["person:person2cartoon", "animal:venom", "object:clay", "object:steampunk", "None"], {"default": "None"}),
+                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123"], {"default": "v2.5-20250123"}),
+                "style": (["person:person2cartoon", "animal:venom", "object:clay", "object:steampunk",
+                           "object:barbie", "object:christmas", "gold", "ancient_bronze", "None"], {"default": "None"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "image_seed": ("INT", {"default": 42}),
@@ -68,32 +68,35 @@ class TripoAPIDraft:
                 "texture_quality": (["standard", "detailed"], {"default": "standard"}),
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
                 "face_limit": ("INT", {"min": -1, "max": 500000, "default": -1}),
+                "quad": ("BOOLEAN", {"default": False}),
             }
         }
         config["required"]["apikey"] = ("STRING", {"default": ""})
         return config
 
     if not tripo_api_key:
-        RETURN_TYPES = ("MESH", "MODEL_TASK_ID", "API_KEY",)
+        RETURN_TYPES = ("STRING", "MODEL_TASK_ID", "API_KEY",)
+        RETURN_NAMES = ("model_file", "model task_id", "API KEY")
     else:
-        RETURN_TYPES = ("MESH", "MODEL_TASK_ID",)
+        RETURN_TYPES = ("STRING", "MODEL_TASK_ID",)
+        RETURN_NAMES = ("model_file", "model task_id")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, mode, prompt=None, image=None, image_left=None, image_back=None, image_right=None,
                       multiview_orth_proj=None, apikey=None, model_version=None, texture=None, pbr=None, style=None,
-                      image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None, face_limit=None):
+                      image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None, face_limit=None, quad=None):
         api, key = GetTripoAPI(apikey)
 
         if mode == "text_to_model":
             if not prompt:
                 raise RuntimeError("Prompt is required")
-            result = api.text_to_3d(prompt, model_version, texture, pbr, image_seed, model_seed, texture_seed, texture_quality, face_limit)
+            result = api.text_to_3d(prompt, model_version, style, texture, pbr, image_seed, model_seed, texture_seed, texture_quality, face_limit, quad)
         elif mode == 'image_to_model':
             if image is None:
                 raise RuntimeError("Image is required")
             image_name = save_tensor(image, os.path.join(get_input_directory(), "image"))
-            result = api.image_to_3d(image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment, face_limit)
+            result = api.image_to_3d(image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment, face_limit, quad)
         elif mode == 'multiview_to_model':
             if image is None:
                 raise RuntimeError("front image for multiview is required")
@@ -104,12 +107,9 @@ class TripoAPIDraft:
                         any_image = i
                         break
                 if any_image is None:
-                    raise RuntimeError("any other images for multiview are required for v2.0")
+                    raise RuntimeError("any other images for multiview are required for >=v2.0")
             else:
-                if (image_left is None) ^ (image_right is None):
-                    raise RuntimeError("only one of left or right image is required for multiview v1.4")
-                if image_back is None:
-                    raise RuntimeError("back image for multiview 1.4 is required")
+                raise RuntimeError("multiview v1.4 is not supported")
             image_names = []
             for image_name in ["image", "image_left", "image_back", "image_right"]:
                 image_ = locals()[image_name]
@@ -143,7 +143,8 @@ class TripoTextureModel:
             config["required"]["apikey"] = ("API_KEY",)
         return config
 
-    RETURN_TYPES = ("MESH", "MODEL_TASK_ID",)
+    RETURN_TYPES = ("STRING", "MODEL_TASK_ID",)
+    RETURN_NAMES = ("model_file", "model task_id")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
@@ -168,7 +169,8 @@ class TripoRefineModel:
             config["required"]["apikey"] = ("API_KEY",)
         return config
 
-    RETURN_TYPES = ("MESH", "MODEL_TASK_ID",)
+    RETURN_TYPES = ("STRING", "MODEL_TASK_ID",)
+    RETURN_NAMES = ("model_file", "model task_id")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
@@ -195,7 +197,8 @@ class TripoAnimateRigNode:
             config["required"]["apikey"] = ("API_KEY",)
         return config
 
-    RETURN_TYPES = ("MESH", "RIG_TASK_ID")
+    RETURN_TYPES = ("STRING", "RIG_TASK_ID")
+    RETURN_NAMES = ("model_file", "rig task_id")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
@@ -222,7 +225,8 @@ class TripoAnimateRetargetNode:
             config["required"]["apikey"] = ("API_KEY",)
         return config
 
-    RETURN_TYPES = ("MESH", "RETARGET_TASK_ID")
+    RETURN_TYPES = ("STRING", "RETARGET_TASK_ID")
+    RETURN_NAMES = ("model_file", "retarget task_id")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
