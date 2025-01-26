@@ -181,7 +181,7 @@ class TripoRefineModel:
             return (result['model'], result['task_id'])
         else:
             if "support" in result["message"]:
-                raise RuntimeError(f"Failed to generate mesh: refine for v2.0 is not supported")
+                raise RuntimeError(f"Failed to generate mesh: refine for >=v2.0 is not supported")
             else:
                 raise RuntimeError(f"Failed to generate mesh: {result['message']}")
 
