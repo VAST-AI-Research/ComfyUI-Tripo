@@ -118,7 +118,7 @@ class TripoAPIDraft:
                     image_names.append(image_filename)
                 else:
                     image_names.append(None)
-            result = api.multiview_to_3d(image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment, face_limit)
+            result = api.multiview_to_3d(image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment, face_limit, quad)
         if result['status'] == 'success':
             return (result['model'], result['task_id'], key)
         else:
