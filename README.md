@@ -80,4 +80,4 @@ Models will be automatically downloaded after generation in `ComfyUI\output` fol
 This project is licensed under the MIT License. See the LICENSE file for details.
 
 ## Credit
-Thansk for initial repo from [Tripo-API-ZHO](https://github.com/ZHO-ZHO-ZHO/Tripo-API-ZHO)
+Thanks for initial repo from [Tripo-API-ZHO](https://github.com/ZHO-ZHO-ZHO/Tripo-API-ZHO)
