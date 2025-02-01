@@ -2,6 +2,7 @@
 This extension integrates Tripo into ComfyUI, allowing users to generate 3D models from text prompts or images directly within the ComfyUI interface.
 
 ## ChangeLog
+- 20250201: adapt for new api; use preview3D for viewing models
 - 20241111: adapt for new api
 - 20241014: support convert
 - 20240913: support model_version v2.0-20240919

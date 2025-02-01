@@ -218,7 +218,17 @@ class TripoAnimateRetargetNode:
         config = {
             "required": {
                 "original_model_task_id": ("RIG_TASK_ID",),
-                "animation": (["preset:walk", "preset:run", "preset:dive"],),
+                "animation": ([
+                    "preset:idle",
+                    "preset:walk",
+                    "preset:climb",
+                    "preset:jump",
+                    "preset:slash",
+                    "preset:shoot",
+                    "preset:hurt",
+                    "preset:fall",
+                    "preset:turn",
+                    ],),
             }
         }
         if not tripo_api_key:
