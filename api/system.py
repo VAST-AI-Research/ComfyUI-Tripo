@@ -81,6 +81,8 @@ class TripoAPI:
             _param = locals()[param_name]
             if _param is not None:
                 param[param_name] = _param
+        if "style" in param and param["style"] == 'None':
+            del param["style"]
         response = self._submit_task(
             "text_to_model",
             param,
