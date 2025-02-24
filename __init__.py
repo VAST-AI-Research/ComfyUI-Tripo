@@ -1,11 +1,8 @@
-import sys
-from os import path
 import os
 import json
 from folder_paths import get_input_directory
-sys.path.insert(0, path.dirname(__file__))
 
-from api.system import TripoAPI, save_tensor
+from .api.system import TripoAPI, save_tensor
 
 tripo_api_key = os.environ.get("TRIPO_API_KEY")
 if not tripo_api_key:
@@ -301,7 +298,6 @@ NODE_CLASS_MAPPINGS = {
     "TripoAnimateRigNode": TripoAnimateRigNode,
     "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
     "TripoConvertNode": TripoConvertNode,
-    "TripoGLBViewer": TripoGLBViewer,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -311,7 +307,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoAnimateRigNode": "Tripo: Rig model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
     "TripoConvertNode": "Tripo: Convert model",
-    "TripoGLBViewer": "Tripo: GLB Viewer",
 }
-
-WEB_DIRECTORY = "./web"
