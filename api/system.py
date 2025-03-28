@@ -306,7 +306,7 @@ class TripoAPI:
         response = requests.get(model_url)
         if response.status_code == 200:
             subfolder = get_output_directory()
-            postfix_index = model_url.find('?auth_key')
+            postfix_index = model_url.find('?')
             assert postfix_index > 0
             model_url = model_url[:postfix_index]
             postfix_index = model_url.rfind('/')
