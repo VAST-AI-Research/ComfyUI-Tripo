@@ -164,7 +164,7 @@ class TripoAPIDraft:
             task = await client.wait_for_task(task_id, verbose=True)
             if task.status == "success":
                 downloaded = await client.download_task_models(task, get_input_directory())
-                return downloaded["model"], task_id, key
+                return downloaded.values()[0], task_id, key
             else:
                 raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
@@ -209,7 +209,7 @@ class TripoTextureModel:
             task = await client.wait_for_task(task_id, verbose=True)
             if task.status == "success":
                 downloaded = await client.download_task_models(task, get_input_directory())
-                return downloaded["model"], task_id
+                return downloaded.values()[0], task_id
             else:
                 raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
@@ -243,7 +243,7 @@ class TripoRefineModel:
             task = await client.wait_for_task(task_id, verbose=True)
             if task.status == "success":
                 downloaded = await client.download_task_models(task, get_input_directory())
-                return downloaded["model"], task_id
+                return downloaded.values()[0], task_id
             else:
                 if "support" in task.error:
                     raise RuntimeError(f"Failed to generate mesh: refine for >=v2.0 is not supported")
@@ -288,7 +288,7 @@ class TripoAnimateRigNode:
             task = await client.wait_for_task(task_id, verbose=True)
             if task.status == "success":
                 downloaded = await client.download_task_models(task, get_input_directory())
-                return downloaded["model"], task_id
+                return downloaded.values()[0], task_id
             else:
                 raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
@@ -338,7 +338,7 @@ class TripoAnimateRetargetNode:
             task = await client.wait_for_task(task_id, verbose=True)
             if task.status == "success":
                 downloaded = await client.download_task_models(task, get_input_directory())
-                return downloaded["model"], task_id
+                return downloaded.values()[0], task_id
             else:
                 raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
@@ -393,7 +393,7 @@ class TripoConvertNode:
             task = await client.wait_for_task(task_id, verbose=True)
             if task.status == "success":
                 downloaded = await client.download_task_models(task, get_input_directory())
-                return (downloaded["model"],)
+                return (downloaded.values()[0],)
             else:
                 raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
