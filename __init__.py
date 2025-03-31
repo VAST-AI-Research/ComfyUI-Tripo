@@ -1,8 +1,9 @@
 import os
 import json
 from folder_paths import get_input_directory
+from tripo3d import TripoClient, ModelStyle, Animation
+import asyncio
 
-from .api.system import TripoAPI, save_tensor
 
 tripo_api_key = os.environ.get("TRIPO_API_KEY")
 if not tripo_api_key:
@@ -11,35 +12,50 @@ if not tripo_api_key:
         config = json.load(f)
         tripo_api_key = config["TRIPO_API_KEY"]
 
+
 def GetTripoAPI(apikey: str):
     apikey = tripo_api_key if tripo_api_key else apikey
     if not apikey:
         raise RuntimeError("TRIPO API key is required")
-    return TripoAPI(apikey), apikey
+    return TripoClient(api_key=apikey), apikey
 
-class TripoGLBViewer:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "mesh": ("STRING",)
-            }
-        }
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "display"
-    CATEGORY = "TripoAPI"
+def save_tensor(image_tensor, filename):
+    import torch
+    from PIL import Image
+    # Assuming the first dimension is the batch size, select the first image
+    if image_tensor.dim() > 3:
+        image_tensor = image_tensor[0]  # Select the first image in the batch
 
-    def display(self, mesh):
-        saved = {
-            "filename": mesh["filename"],
-            "type": "output",
-            "subfolder": mesh["sub_folder"]
-        }
+    # Convert from float tensors to uint8
+    if image_tensor.dtype == torch.float32:
+        image_tensor = (image_tensor * 255).byte()
 
-        return {"ui": {"mesh": [saved]}}
+    # Check if it's a single color channel (grayscale) and needs color dimension expansion
+    if image_tensor.dim() == 2:
+        image_tensor = image_tensor.unsqueeze(0)  # Add a channel dimension
 
+    # Permute the tensor dimensions if it's in C x H x W format to H x W x C for RGB
+    if image_tensor.dim() == 3 and image_tensor.size(0) == 3:
+        image_tensor = image_tensor.permute(1, 2, 0)
+
+    # Ensure tensor is on the CPU
+    if image_tensor.is_cuda:
+        image_tensor = image_tensor.cpu()
+
+    # Convert to numpy array
+    image_np = image_tensor.numpy()
+
+    # Convert numpy array to PIL Image
+    image_pil = Image.fromarray(image_np)
+
+    if image_np.shape[2] == 4:
+        name = filename + '.png'
+        image_pil.save(name, 'PNG')
+    else:
+        name = filename + '.jpg'
+        image_pil.save(name, 'JPEG')
+    return name
 
 class TripoAPIDraft:
     @classmethod
@@ -55,8 +71,8 @@ class TripoAPIDraft:
                 "image_back": ("IMAGE",),
                 "image_right": ("IMAGE",),
                 "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123"], {"default": "v2.5-20250123"}),
-                "style": (["person:person2cartoon", "animal:venom", "object:clay", "object:steampunk",
-                           "object:barbie", "object:christmas", "gold", "ancient_bronze", "None"], {"default": "None"}),
+                "style": (["None", "person:person2cartoon", "animal:venom", "object:clay", "object:steampunk",
+                           "object:barbie", "object:christmas", "gold", "ancient_bronze"], {"default": "None"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "image_seed": ("INT", {"default": 42}),
@@ -81,45 +97,78 @@ class TripoAPIDraft:
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, mode, prompt=None, image=None, image_left=None, image_back=None, image_right=None,
-                      multiview_orth_proj=None, apikey=None, model_version=None, texture=None, pbr=None, style=None,
+                      apikey=None, model_version=None, texture=None, pbr=None, style=None,
                       image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None, face_limit=None, quad=None):
-        api, key = GetTripoAPI(apikey)
-
-        if mode == "text_to_model":
-            if not prompt:
-                raise RuntimeError("Prompt is required")
-            result = api.text_to_3d(prompt, model_version, style, texture, pbr, image_seed, model_seed, texture_seed, texture_quality, face_limit, quad)
-        elif mode == 'image_to_model':
-            if image is None:
-                raise RuntimeError("Image is required")
-            image_name = save_tensor(image, os.path.join(get_input_directory(), "image"))
-            result = api.image_to_3d(image_name, model_version, style, texture, pbr, model_seed, texture_seed, texture_quality, texture_alignment, face_limit, quad)
-        elif mode == 'multiview_to_model':
-            if image is None:
-                raise RuntimeError("front image for multiview is required")
-            if model_version.startswith('v2'):
-                any_image = None
-                for i in [image_back, image_right, image_left]:
-                    if i is not None:
-                        any_image = i
-                        break
-                if any_image is None:
-                    raise RuntimeError("any other images for multiview are required for >=v2.0")
+        client, key = GetTripoAPI(apikey)
+        
+        # Convert style string to ModelStyle enum
+        style_enum = None if style == "None" else ModelStyle(style)
+        
+        async def process():
+            if mode == "text_to_model":
+                if not prompt:
+                    raise RuntimeError("Prompt is required")
+                task_id = await client.text_to_model(
+                    prompt=prompt,
+                    model_version=model_version,
+                    style=style_enum,
+                    texture=texture,
+                    pbr=pbr,
+                    text_seed=image_seed,
+                    model_seed=model_seed,
+                    texture_seed=texture_seed,
+                    texture_quality=texture_quality,
+                    face_limit=face_limit,
+                    quad=quad
+                )
+            elif mode == 'image_to_model':
+                if image is None:
+                    raise RuntimeError("Image is required")
+                image_path = save_tensor(image)
+                task_id = await client.image_to_model(
+                    image=image_path,
+                    model_version=model_version,
+                    style=style_enum,
+                    texture=texture,
+                    pbr=pbr,
+                    model_seed=model_seed,
+                    texture_seed=texture_seed,
+                    texture_quality=texture_quality,
+                    texture_alignment=texture_alignment,
+                    face_limit=face_limit,
+                    quad=quad
+                )
+            elif mode == 'multiview_to_model':
+                if image is None:
+                    raise RuntimeError("front image for multiview is required")
+                images = []
+                for img in [image, image_left, image_back, image_right]:
+                    if img is not None:
+                        img_path = save_tensor(img)
+                        images.append(img_path)
+                    else:
+                        images.append(None)
+                task_id = await client.multiview_to_model(
+                    images=images,
+                    model_version=model_version,
+                    texture=texture,
+                    pbr=pbr,
+                    model_seed=model_seed,
+                    texture_seed=texture_seed,
+                    texture_quality=texture_quality,
+                    texture_alignment=texture_alignment,
+                    face_limit=face_limit,
+                    quad=quad
+                )
+            
+            task = await client.wait_for_task(task_id, verbose=True)
+            if task.status == "success":
+                downloaded = await client.download_task_models(task, get_input_directory())
+                return downloaded["model"], task_id, key
             else:
-                raise RuntimeError("multiview v1.4 is not supported")
-            image_names = []
-            for image_name in ["image", "image_left", "image_back", "image_right"]:
-                image_ = locals()[image_name]
-                if image_ is not None:
-                    image_filename = save_tensor(image_, os.path.join(get_input_directory(), image_name))
-                    image_names.append(image_filename)
-                else:
-                    image_names.append(None)
-            result = api.multiview_to_3d(image_names, model_version, texture, pbr, multiview_orth_proj, model_seed, texture_seed, texture_quality, texture_alignment, face_limit, quad)
-        if result['status'] == 'success':
-            return (result['model'], result['task_id'], key)
-        else:
-            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+                raise RuntimeError(f"Failed to generate mesh: {task.error}")
+
+        return asyncio.run(process())
 
 class TripoTextureModel:
     @classmethod
@@ -146,12 +195,25 @@ class TripoTextureModel:
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, model_task_id, texture=None, pbr=None, texture_seed=None, texture_quality=None, texture_alignment=None, apikey=None):
-        api, key = GetTripoAPI(apikey)
-        result = api.texture(model_task_id, texture, pbr, texture_seed, texture_quality, texture_alignment)
-        if result['status'] == 'success':
-            return (result['model'], result['task_id'])
-        else:
-            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+        client, key = GetTripoAPI(apikey)
+        
+        async def process():
+            task_id = await client.texture_model(
+                original_model_task_id=model_task_id,
+                texture=texture,
+                pbr=pbr,
+                texture_seed=texture_seed,
+                texture_quality=texture_quality,
+                texture_alignment=texture_alignment
+            )
+            task = await client.wait_for_task(task_id, verbose=True)
+            if task.status == "success":
+                downloaded = await client.download_task_models(task, get_input_directory())
+                return downloaded["model"], task_id
+            else:
+                raise RuntimeError(f"Failed to generate mesh: {task.error}")
+
+        return asyncio.run(process())
 
 
 class TripoRefineModel:
@@ -172,15 +234,23 @@ class TripoRefineModel:
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, model_task_id, apikey=None):
-        api, key = GetTripoAPI(apikey)
-        result = api.refine_draft(model_task_id)
-        if result['status'] == 'success':
-            return (result['model'], result['task_id'])
-        else:
-            if "support" in result["message"]:
-                raise RuntimeError(f"Failed to generate mesh: refine for >=v2.0 is not supported")
+        client, key = GetTripoAPI(apikey)
+        
+        async def process():
+            task_id = await client.refine_model(
+                draft_model_task_id=model_task_id
+            )
+            task = await client.wait_for_task(task_id, verbose=True)
+            if task.status == "success":
+                downloaded = await client.download_task_models(task, get_input_directory())
+                return downloaded["model"], task_id
             else:
-                raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+                if "support" in task.error:
+                    raise RuntimeError(f"Failed to generate mesh: refine for >=v2.0 is not supported")
+                else:
+                    raise RuntimeError(f"Failed to generate mesh: {task.error}")
+
+        return asyncio.run(process())
 
 class TripoAnimateRigNode:
     @classmethod
@@ -200,14 +270,29 @@ class TripoAnimateRigNode:
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, original_model_task_id, apikey=None):
-        # if original_model_task_id is None or original_model_task_id == "":
-        #     raise RuntimeError("original_model_task_id is required")
-        api, key = GetTripoAPI(apikey)
-        result = api.animate_rig(original_model_task_id)
-        if result['status'] == 'success':
-            return (result['model'], result['task_id'])
-        else:
-            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+        client, key = GetTripoAPI(apikey)
+        
+        async def process():
+            # First check if model can be rigged
+            check_task_id = await client.check_riggable(original_model_task_id)
+            check_result = await client.wait_for_task(check_task_id, verbose=True)
+            
+            if not check_result.output.riggable:
+                raise RuntimeError("Model cannot be rigged")
+            
+            task_id = await client.rig_model(
+                original_model_task_id=original_model_task_id,
+                out_format="glb",
+                spec="tripo"
+            )
+            task = await client.wait_for_task(task_id, verbose=True)
+            if task.status == "success":
+                downloaded = await client.download_task_models(task, get_input_directory())
+                return downloaded["model"], task_id
+            else:
+                raise RuntimeError(f"Failed to generate mesh: {task.error}")
+
+        return asyncio.run(process())
 
 class TripoAnimateRetargetNode:
     @classmethod
@@ -225,7 +310,7 @@ class TripoAnimateRetargetNode:
                     "preset:hurt",
                     "preset:fall",
                     "preset:turn",
-                    ],),
+                ],),
             }
         }
         if not tripo_api_key:
@@ -238,16 +323,26 @@ class TripoAnimateRetargetNode:
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, animation, original_model_task_id, apikey=None):
-        # if not original_model_task_id:
-        #     raise RuntimeError("original_model_task_id is required")
-        # if not animation:
-        #     raise RuntimeError("Animation is required")
-        api, key = GetTripoAPI(apikey)
-        result = api.animate_retarget(original_model_task_id, animation)
-        if result['status'] == 'success':
-            return (result['model'],)
-        else:
-            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+        client, key = GetTripoAPI(apikey)
+        
+        # Convert animation string to Animation enum
+        animation_enum = Animation(animation)
+        
+        async def process():
+            task_id = await client.retarget_animation(
+                original_model_task_id=original_model_task_id,
+                animation=animation_enum,
+                out_format="glb",
+                bake_animation=True
+            )
+            task = await client.wait_for_task(task_id, verbose=True)
+            if task.status == "success":
+                downloaded = await client.download_task_models(task, get_input_directory())
+                return downloaded["model"], task_id
+            else:
+                raise RuntimeError(f"Failed to generate mesh: {task.error}")
+
+        return asyncio.run(process())
 
 class TripoConvertNode:
     @classmethod
@@ -284,12 +379,25 @@ class TripoConvertNode:
     def generate_mesh(self, original_model_task_id, format, quad, face_limit, texture_size, texture_format, apikey=None):
         if not original_model_task_id:
             raise RuntimeError("original_model_task_id is required")
-        api, key = GetTripoAPI(apikey)
-        result = api.convert(original_model_task_id, format, quad, face_limit, texture_size, texture_format)
-        if result['status'] == 'success':
-            return (result['model'],)
-        else:
-            raise RuntimeError(f"Failed to generate mesh: {result['message']}")
+        client, key = GetTripoAPI(apikey)
+        
+        async def process():
+            task_id = await client.convert_model(
+                original_model_task_id=original_model_task_id,
+                format=format,
+                quad=quad,
+                face_limit=face_limit,
+                texture_size=texture_size,
+                texture_format=texture_format
+            )
+            task = await client.wait_for_task(task_id, verbose=True)
+            if task.status == "success":
+                downloaded = await client.download_task_models(task, get_input_directory())
+                return (downloaded["model"],)
+            else:
+                raise RuntimeError(f"Failed to generate mesh: {task.error}")
+
+        return asyncio.run(process())
 
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,

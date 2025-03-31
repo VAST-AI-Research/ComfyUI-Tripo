@@ -1,4 +1,1 @@
-requests
-pillow
-websockets
-asyncio
+tripo3d>=0.1.3
