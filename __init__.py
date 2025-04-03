@@ -100,7 +100,6 @@ class TripoAPIDraft:
                       apikey=None, model_version=None, texture=None, pbr=None, style=None,
                       image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None, face_limit=None, quad=None):
         client, key = GetTripoAPI(apikey)
-
         async def process():
             async with client:
                 style_enum = None if style == "None" else ModelStyle(style)
@@ -141,10 +140,16 @@ class TripoAPIDraft:
                     if image is None:
                         raise RuntimeError("front image for multiview is required")
                     images = []
+                    image_dict = {
+                        "image": image,
+                        "image_left": image_left,
+                        "image_back": image_back,
+                        "image_right": image_right
+                    }
                     for image_name in ["image", "image_left", "image_back", "image_right"]:
-                        image_ = locals()[image_name]
-                        if image_  is not None:
-                            image_filename  = save_tensor(image_ , os.path.join(get_input_directory(), image_name))
+                        image_ = image_dict[image_name]
+                        if image_ is not None:
+                            image_filename = save_tensor(image_, os.path.join(get_input_directory(), image_name))
                             images.append(image_filename)
                         else:
                             images.append(None)
