@@ -419,6 +419,58 @@ class TripoConvertNode:
 
         return asyncio.run(process())
 
+
+class TripoRenameNode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        config = {
+            "required": {
+                "model_file": ("STRING", {"default": ""}),
+                "new_filename": ("STRING", {"default": ""}),
+            },
+            "optional": {
+                "output_directory": ("STRING", {"default": ""})
+            }
+        }
+        return config
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("renamed_file",)
+    FUNCTION = "rename_file"
+    CATEGORY = "TripoAPI"
+
+    def rename_file(self, model_file, new_filename, output_directory=""):
+        if not model_file or not new_filename:
+            raise RuntimeError("Both model_file and new_filename are required")
+
+        import os
+
+        if not os.path.exists(model_file):
+            raise RuntimeError(f"Source file does not exist: {model_file}")
+
+        # Use original directory if output_directory is not specified
+        source_directory = os.path.dirname(model_file)
+        target_directory = output_directory if output_directory else source_directory
+
+        # Create output directory if it doesn't exist
+        if output_directory and not os.path.exists(target_directory):
+            os.makedirs(target_directory, exist_ok=True)
+
+        extension = os.path.splitext(model_file)[1]
+
+        # Ensure the new filename has the correct extension
+        if not new_filename.endswith(extension):
+            new_filename += extension
+
+        new_path = os.path.join(target_directory, new_filename)
+
+        # Directly move/rename the file
+        os.rename(model_file, new_path)
+
+        print(f"File renamed from {model_file} to {new_path}")
+        return new_path
+
+
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
     "TripoTextureModel": TripoTextureModel,
@@ -426,6 +478,7 @@ NODE_CLASS_MAPPINGS = {
     "TripoAnimateRigNode": TripoAnimateRigNode,
     "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
     "TripoConvertNode": TripoConvertNode,
+    "TripoRenameNode": TripoRenameNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -435,4 +488,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoAnimateRigNode": "Tripo: Rig model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
     "TripoConvertNode": "Tripo: Convert model",
+    "TripoRenameNode": "Tripo: Rename model",
 }
