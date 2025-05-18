@@ -1,9 +1,9 @@
 import os
 import json
+
 from folder_paths import get_input_directory, get_output_directory
 from tripo3d import TripoClient, ModelStyle, Animation
 import asyncio
-
 
 tripo_api_key = os.environ.get("TRIPO_API_KEY")
 if not tripo_api_key:
@@ -12,12 +12,17 @@ if not tripo_api_key:
         config = json.load(f)
         tripo_api_key = config["TRIPO_API_KEY"]
 
+# global tripo_client
+tripo_client = None  # Initialize the variable to None
 
 def GetTripoAPI(apikey: str):
+    global tripo_client
     apikey = tripo_api_key if tripo_api_key else apikey
     if not apikey:
         raise RuntimeError("TRIPO API key is required")
-    return TripoClient(api_key=apikey), apikey
+    if tripo_client is None:
+        tripo_client = TripoClient(api_key=apikey)
+    return tripo_client, apikey
 
 
 def save_tensor(image_tensor, filename):
@@ -57,6 +62,35 @@ def save_tensor(image_tensor, filename):
         image_pil.save(name, 'JPEG')
     return name
 
+
+def rename_model(model_file, file_prefix, output_directory):
+    if not os.path.exists(model_file):
+        raise RuntimeError(f"Source file does not exist: {model_file}")
+
+    if not file_prefix and not output_directory:
+        return model_file
+
+    # Use original directory if output_directory is not specified
+    source_directory = os.path.dirname(model_file)
+    target_directory = output_directory if output_directory else source_directory
+
+    # Create output directory if it doesn't exist
+    if output_directory and not os.path.exists(target_directory):
+        os.makedirs(target_directory, exist_ok=True)
+
+    base_name = os.path.basename(model_file)
+
+    # Create new filename with prefix
+    new_name = f"{file_prefix}{base_name}"
+    new_path = os.path.join(target_directory, new_name)
+
+    # Directly move/rename the file
+    os.rename(model_file, new_path)
+
+    print(f"File renamed from {model_file} to {new_path}")
+    return new_path
+
+
 class TripoAPIDraft:
     @classmethod
     def INPUT_TYPES(s):
@@ -82,23 +116,22 @@ class TripoAPIDraft:
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
                 "face_limit": ("INT", {"min": -1, "max": 500000, "default": -1}),
                 "quad": ("BOOLEAN", {"default": False}),
+                "file_prefix": ("STRING", {"default": ""}),
+                "output_directory": ("STRING", {"default": ""}),
             }
         }
         config["required"]["apikey"] = ("STRING", {"default": ""})
         return config
 
-    if not tripo_api_key:
-        RETURN_TYPES = ("STRING", "MODEL_TASK_ID", "API_KEY",)
-        RETURN_NAMES = ("model_file", "model task_id", "API KEY")
-    else:
-        RETURN_TYPES = ("STRING", "MODEL_TASK_ID",)
-        RETURN_NAMES = ("model_file", "model task_id")
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
     def generate_mesh(self, mode, prompt=None, image=None, image_left=None, image_back=None, image_right=None,
                       apikey=None, model_version=None, texture=None, pbr=None, style=None,
-                      image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None, face_limit=None, quad=None):
+                      image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None,
+                      face_limit=None, quad=None, file_prefix=None, output_directory=None):
         client, key = GetTripoAPI(apikey)
         async def process():
             async with client:
@@ -171,7 +204,13 @@ class TripoAPIDraft:
                     downloaded = await client.download_task_models(task, get_output_directory())
                     model_file = next(iter(downloaded.values()))
                     print(f"model_file: {model_file}")
-                    return model_file, task_id, key
+                    return rename_model(model_file, file_prefix, output_directory), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": file_prefix,
+                            "output_directory": output_directory
+                        }
                 else:
                     raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
@@ -180,9 +219,9 @@ class TripoAPIDraft:
 class TripoTextureModel:
     @classmethod
     def INPUT_TYPES(s):
-        config = {
+        return {
             "required": {
-                "model_task_id": ("MODEL_TASK_ID",),
+                "model_info": ("MODEL_INFO",),
             },
             "optional": {
                 "texture": ("BOOLEAN", {"default": True}),
@@ -192,22 +231,19 @@ class TripoTextureModel:
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
             }
         }
-        if not tripo_api_key:
-            config["required"]["apikey"] = ("API_KEY",)
-        return config
 
-    RETURN_TYPES = ("STRING", "MODEL_TASK_ID",)
-    RETURN_NAMES = ("model_file", "model task_id")
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, model_task_id, texture=None, pbr=None, texture_seed=None, texture_quality=None, texture_alignment=None, apikey=None):
-        client, key = GetTripoAPI(apikey)
+    def generate_mesh(self, model_info, texture=None, pbr=None, texture_seed=None, texture_quality=None, texture_alignment=None):
+        client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
             async with client:
                 task_id = await client.texture_model(
-                    original_model_task_id=model_task_id,
+                    original_model_task_id=model_info["task_id"],
                     texture=texture,
                     pbr=pbr,
                     texture_seed=texture_seed,
@@ -219,7 +255,13 @@ class TripoTextureModel:
                     downloaded = await client.download_task_models(task, get_output_directory())
                     model_file = next(iter(downloaded.values()))
                     print(f"model_file: {model_file}")
-                    return model_file, task_id
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": model_info["file_prefix"],
+                            "output_directory": model_info["output_directory"]
+                        }
                 else:
                     raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
@@ -229,34 +271,37 @@ class TripoTextureModel:
 class TripoRefineModel:
     @classmethod
     def INPUT_TYPES(s):
-        config = {
+        return {
             "required": {
-                "model_task_id": ("MODEL_TASK_ID",),
+                "model_info": ("MODEL_INFO",),
             }
         }
-        if not tripo_api_key:
-            config["required"]["apikey"] = ("API_KEY",)
-        return config
 
-    RETURN_TYPES = ("STRING", "MODEL_TASK_ID",)
-    RETURN_NAMES = ("model_file", "model task_id")
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, model_task_id, apikey=None):
-        client, key = GetTripoAPI(apikey)
+    def generate_mesh(self, model_info):
+        client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
             async with client:
                 task_id = await client.refine_model(
-                    draft_model_task_id=model_task_id
+                    draft_model_task_id=model_info["task_id"]
                 )
                 task = await client.wait_for_task(task_id, verbose=True)
                 if task.status == "success":
                     downloaded = await client.download_task_models(task, get_output_directory())
                     model_file = next(iter(downloaded.values()))
                     print(f"model_file: {model_file}")
-                    return model_file, task_id
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": model_info["file_prefix"],
+                            "output_directory": model_info["output_directory"]
+                        }
                 else:
                     if "support" in task.error:
                         raise RuntimeError(f"Failed to generate mesh: refine for >=v2.0 is not supported")
@@ -268,34 +313,31 @@ class TripoRefineModel:
 class TripoAnimateRigNode:
     @classmethod
     def INPUT_TYPES(s):
-        config = {
+        return {
             "required": {
-                "original_model_task_id": ("MODEL_TASK_ID",),
+                "model_info": ("MODEL_INFO",),
             }
         }
-        if not tripo_api_key:
-            config["required"]["apikey"] = ("API_KEY",)
-        return config
 
-    RETURN_TYPES = ("STRING", "RIG_TASK_ID")
-    RETURN_NAMES = ("model_file", "rig task_id")
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, original_model_task_id, apikey=None):
-        client, key = GetTripoAPI(apikey)
+    def generate_mesh(self, model_info):
+        client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
             async with client:
                 # First check if model can be rigged
-                check_task_id = await client.check_riggable(original_model_task_id)
+                check_task_id = await client.check_riggable(model_info["task_id"])
                 check_result = await client.wait_for_task(check_task_id, verbose=True)
 
                 if not check_result.output.riggable:
                     raise RuntimeError("Model cannot be rigged")
 
                 task_id = await client.rig_model(
-                    original_model_task_id=original_model_task_id,
+                    original_model_task_id=model_info["task_id"],
                     out_format="glb",
                     spec="tripo"
                 )
@@ -304,7 +346,13 @@ class TripoAnimateRigNode:
                     downloaded = await client.download_task_models(task, get_output_directory())
                     model_file = next(iter(downloaded.values()))
                     print(f"model_file: {model_file}")
-                    return model_file, task_id
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": model_info["file_prefix"],
+                            "output_directory": model_info["output_directory"]
+                        }
                 else:
                     raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
@@ -313,9 +361,9 @@ class TripoAnimateRigNode:
 class TripoAnimateRetargetNode:
     @classmethod
     def INPUT_TYPES(s):
-        config = {
+        return {
             "required": {
-                "original_model_task_id": ("RIG_TASK_ID",),
+                "model_info": ("MODEL_INFO",),
                 "animation": ([
                     "preset:idle",
                     "preset:walk",
@@ -329,23 +377,20 @@ class TripoAnimateRetargetNode:
                 ],),
             }
         }
-        if not tripo_api_key:
-            config["required"]["apikey"] = ("API_KEY",)
-        return config
 
-    RETURN_TYPES = ("STRING", "RETARGET_TASK_ID")
-    RETURN_NAMES = ("model_file", "retarget task_id")
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, animation, original_model_task_id, apikey=None):
-        client, key = GetTripoAPI(apikey)
+    def generate_mesh(self, model_info, animation):
+        client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
             async with client:
                 animation_enum = Animation(animation)
                 task_id = await client.retarget_animation(
-                    original_model_task_id=original_model_task_id,
+                    original_model_task_id=model_info["task_id"],
                     animation=animation_enum,
                     out_format="glb",
                     bake_animation=True
@@ -355,7 +400,13 @@ class TripoAnimateRetargetNode:
                     downloaded = await client.download_task_models(task, get_output_directory())
                     model_file = next(iter(downloaded.values()))
                     print(f"model_file: {model_file}")
-                    return model_file, task_id
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": model_info["file_prefix"],
+                            "output_directory": model_info["output_directory"]
+                        }
                 else:
                     raise RuntimeError(f"Failed to generate mesh: {task.error}")
 
@@ -364,9 +415,9 @@ class TripoAnimateRetargetNode:
 class TripoConvertNode:
     @classmethod
     def INPUT_TYPES(s):
-        config = {
+        return {
             "required": {
-                "original_model_task_id": ("MODEL_TASK_ID,RIG_TASK_ID,RETARGET_TASK_ID",),
+                "model_info": ("MODEL_INFO",),
                 "format": (["GLTF", "USDZ", "FBX", "OBJ", "STL", "3MF"],),
             },
             "optional": {
@@ -376,32 +427,19 @@ class TripoConvertNode:
                 "texture_format": (["BMP", "DPX", "HDR", "JPEG", "OPEN_EXR", "PNG", "TARGA", "TIFF", "WEBP"], {"default": "JPEG"})
             }
         }
-        if not tripo_api_key:
-            config["required"]["apikey"] = ("API_KEY",)
-        return config
 
-    @classmethod
-    def VALIDATE_INPUTS(cls, input_types):
-        # The min and max of input1 and input2 are still validated because
-        # we didn't take `input1` or `input2` as arguments
-        if input_types["original_model_task_id"] not in ("MODEL_TASK_ID", "RIG_TASK_ID", "RETARGET_TASK_ID"):
-            return "original_model_task_id must be MODEL_TASK_ID, RIG_TASK_ID or RETARGET_TASK_ID type"
-        return True
-
-    RETURN_TYPES = ()
+    RETURN_TYPES = ("STRING",)
     OUTPUT_NODE = True
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, original_model_task_id, format, quad, face_limit, texture_size, texture_format, apikey=None):
-        if not original_model_task_id:
-            raise RuntimeError("original_model_task_id is required")
-        client, key = GetTripoAPI(apikey)
+    def generate_mesh(self, model_info, format, quad, face_limit, texture_size, texture_format):
+        client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
             async with client:
                 task_id = await client.convert_model(
-                    original_model_task_id=original_model_task_id,
+                    original_model_task_id=model_info["task_id"],
                     format=format,
                     quad=quad,
                     face_limit=face_limit,
@@ -420,57 +458,6 @@ class TripoConvertNode:
         return asyncio.run(process())
 
 
-class TripoRenameNode:
-    @classmethod
-    def INPUT_TYPES(cls):
-        config = {
-            "required": {
-                "model_file": ("STRING", {"default": ""}),
-                "new_filename": ("STRING", {"default": ""}),
-            },
-            "optional": {
-                "output_directory": ("STRING", {"default": ""})
-            }
-        }
-        return config
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("renamed_file",)
-    FUNCTION = "rename_file"
-    CATEGORY = "TripoAPI"
-
-    def rename_file(self, model_file, new_filename, output_directory=""):
-        if not model_file or not new_filename:
-            raise RuntimeError("Both model_file and new_filename are required")
-
-        import os
-
-        if not os.path.exists(model_file):
-            raise RuntimeError(f"Source file does not exist: {model_file}")
-
-        # Use original directory if output_directory is not specified
-        source_directory = os.path.dirname(model_file)
-        target_directory = output_directory if output_directory else source_directory
-
-        # Create output directory if it doesn't exist
-        if output_directory and not os.path.exists(target_directory):
-            os.makedirs(target_directory, exist_ok=True)
-
-        extension = os.path.splitext(model_file)[1]
-
-        # Ensure the new filename has the correct extension
-        if not new_filename.endswith(extension):
-            new_filename += extension
-
-        new_path = os.path.join(target_directory, new_filename)
-
-        # Directly move/rename the file
-        os.rename(model_file, new_path)
-
-        print(f"File renamed from {model_file} to {new_path}")
-        return new_path
-
-
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
     "TripoTextureModel": TripoTextureModel,
@@ -478,7 +465,6 @@ NODE_CLASS_MAPPINGS = {
     "TripoAnimateRigNode": TripoAnimateRigNode,
     "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
     "TripoConvertNode": TripoConvertNode,
-    "TripoRenameNode": TripoRenameNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -488,5 +474,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoAnimateRigNode": "Tripo: Rig model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
     "TripoConvertNode": "Tripo: Convert model",
-    "TripoRenameNode": "Tripo: Rename model",
 }
