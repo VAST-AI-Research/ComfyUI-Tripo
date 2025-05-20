@@ -303,10 +303,7 @@ class TripoRefineModel:
                             "output_directory": model_info["output_directory"]
                         }
                 else:
-                    if "support" in task.error:
-                        raise RuntimeError(f"Failed to generate mesh: refine for >=v2.0 is not supported")
-                    else:
-                        raise RuntimeError(f"Failed to generate mesh: {task.error}")
+                    raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
         return asyncio.run(process())
 
@@ -354,7 +351,7 @@ class TripoAnimateRigNode:
                             "output_directory": model_info["output_directory"]
                         }
                 else:
-                    raise RuntimeError(f"Failed to generate mesh: {task.error}")
+                    raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
         return asyncio.run(process())
 
@@ -408,7 +405,7 @@ class TripoAnimateRetargetNode:
                             "output_directory": model_info["output_directory"]
                         }
                 else:
-                    raise RuntimeError(f"Failed to generate mesh: {task.error}")
+                    raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
         return asyncio.run(process())
 
@@ -451,9 +448,9 @@ class TripoConvertNode:
                     downloaded = await client.download_task_models(task, get_output_directory())
                     model_file = next(iter(downloaded.values()))
                     print(f"model_file: {model_file}")
-                    return model_file
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"])
                 else:
-                    raise RuntimeError(f"Failed to generate mesh: {task.error}")
+                    raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
         return asyncio.run(process())
 
