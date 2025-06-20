@@ -100,6 +100,7 @@ class TripoAPIDraft:
             },
             "optional": {
                 "prompt": ("STRING", {"multiline": True}),
+                "negative_prompt": ("STRING", {"multiline": True}),
                 "image": ("IMAGE",),
                 "image_left": ("IMAGE",),
                 "image_back": ("IMAGE",),
@@ -116,6 +117,11 @@ class TripoAPIDraft:
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
                 "face_limit": ("INT", {"min": -1, "max": 500000, "default": -1}),
                 "quad": ("BOOLEAN", {"default": False}),
+                "compress": ("BOOLEAN", {"default": False}),
+                "generate_parts": ("BOOLEAN", {"default": False}),
+                "smart_low_poly": ("BOOLEAN", {"default": False}),
+                "auto_size": ("BOOLEAN", {"default": False}),
+                "orientation": (["default", "align_image"], {"default": "default"}),
                 "file_prefix": ("STRING", {"default": ""}),
                 "output_directory": ("STRING", {"default": ""}),
             }
@@ -128,10 +134,11 @@ class TripoAPIDraft:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, mode, prompt=None, image=None, image_left=None, image_back=None, image_right=None,
+    def generate_mesh(self, mode, prompt=None, negative_prompt=None, image=None, image_left=None, image_back=None, image_right=None,
                       apikey=None, model_version=None, texture=None, pbr=None, style=None,
                       image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, texture_alignment=None,
-                      face_limit=None, quad=None, file_prefix=None, output_directory=None):
+                      face_limit=None, quad=None, compress=None, generate_parts=None, smart_low_poly=None,
+                      auto_size=None, orientation=None, file_prefix=None, output_directory=None):
         client, key = GetTripoAPI(apikey)
         async def process():
             async with client:
@@ -141,16 +148,21 @@ class TripoAPIDraft:
                         raise RuntimeError("Prompt is required")
                     task_id = await client.text_to_model(
                         prompt=prompt,
+                        negative_prompt=negative_prompt,
                         model_version=model_version,
                         style=style_enum,
                         texture=texture,
                         pbr=pbr,
-                        text_seed=image_seed,
+                        image_seed=image_seed,
                         model_seed=model_seed,
                         texture_seed=texture_seed,
                         texture_quality=texture_quality,
                         face_limit=face_limit,
-                        quad=quad
+                        quad=quad,
+                        compress=compress,
+                        generate_parts=generate_parts,
+                        smart_low_poly=smart_low_poly,
+                        auto_size=auto_size
                     )
                 elif mode == 'image_to_model':
                     if image is None:
@@ -167,7 +179,12 @@ class TripoAPIDraft:
                         texture_quality=texture_quality,
                         texture_alignment=texture_alignment,
                         face_limit=face_limit,
-                        quad=quad
+                        quad=quad,
+                        compress=compress,
+                        generate_parts=generate_parts,
+                        smart_low_poly=smart_low_poly,
+                        auto_size=auto_size,
+                        orientation=orientation
                     )
                 elif mode == 'multiview_to_model':
                     if image is None:
@@ -196,7 +213,12 @@ class TripoAPIDraft:
                         texture_quality=texture_quality,
                         texture_alignment=texture_alignment,
                         face_limit=face_limit,
-                        quad=quad
+                        quad=quad,
+                        compress=compress,
+                        generate_parts=generate_parts,
+                        smart_low_poly=smart_low_poly,
+                        auto_size=auto_size,
+                        orientation=orientation
                     )
 
                 task = await client.wait_for_task(task_id, verbose=True)
@@ -229,6 +251,12 @@ class TripoTextureModel:
                 "texture_seed": ("INT", {"default": 42}),
                 "texture_quality": (["standard", "detailed"], {"default": "standard"}),
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
+                "text_prompt": ("STRING", {"multiline": True}),
+                "image_prompt": ("IMAGE",),
+                "style_image": ("IMAGE",),
+                "part_names": ("STRING", {"multiline": True}),
+                "compress": ("BOOLEAN", {"default": False}),
+                "bake": ("BOOLEAN", {"default": True}),
             }
         }
 
@@ -237,18 +265,38 @@ class TripoTextureModel:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, model_info, texture=None, pbr=None, texture_seed=None, texture_quality=None, texture_alignment=None):
+    def generate_mesh(self, model_info, texture=None, pbr=None, texture_seed=None, texture_quality=None,
+                     texture_alignment=None, text_prompt=None, image_prompt=None, style_image=None,
+                     part_names=None, compress=None, bake=None):
         client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
             async with client:
+                # Handle image inputs
+                image_prompt_path = None
+                if image_prompt is not None:
+                    image_prompt_path = save_tensor(image_prompt, os.path.join(get_input_directory(), "image_prompt"))
+
+                style_image_path = None
+                if style_image is not None:
+                    style_image_path = save_tensor(style_image, os.path.join(get_input_directory(), "style_image"))
+
+                # Handle part names
+                part_names_list = part_names.split('\n') if part_names else None
+
                 task_id = await client.texture_model(
                     original_model_task_id=model_info["task_id"],
                     texture=texture,
                     pbr=pbr,
                     texture_seed=texture_seed,
                     texture_quality=texture_quality,
-                    texture_alignment=texture_alignment
+                    texture_alignment=texture_alignment,
+                    part_names=part_names_list,
+                    compress=compress,
+                    bake=bake,
+                    text_prompt=text_prompt,
+                    image_prompt=image_prompt_path,
+                    style_image=style_image_path
                 )
                 task = await client.wait_for_task(task_id, verbose=True)
                 if task.status == "success":
@@ -313,6 +361,8 @@ class TripoAnimateRigNode:
         return {
             "required": {
                 "model_info": ("MODEL_INFO",),
+                "out_format": (["glb", "fbx"], {"default": "glb"}),
+                "spec": (["mixamo", "tripo"], {"default": "tripo"}),
             }
         }
 
@@ -321,7 +371,7 @@ class TripoAnimateRigNode:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, model_info):
+    def generate_mesh(self, model_info, out_format, spec):
         client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
@@ -333,10 +383,16 @@ class TripoAnimateRigNode:
                 if not check_result.output.riggable:
                     raise RuntimeError("Model cannot be rigged")
 
+                # Get the rig type from check result
+                rig_type = check_result.output.rig_type
+                if not rig_type:
+                    raise RuntimeError("No suitable rig type found for the model")
+
                 task_id = await client.rig_model(
                     original_model_task_id=model_info["task_id"],
-                    out_format="glb",
-                    spec="tripo"
+                    out_format=out_format,
+                    rig_type=rig_type,
+                    spec=spec
                 )
                 task = await client.wait_for_task(task_id, verbose=True)
                 if task.status == "success":
@@ -364,6 +420,8 @@ class TripoAnimateRetargetNode:
                 "animation": ([
                     "preset:idle",
                     "preset:walk",
+                    "preset:run",
+                    "preset:dive",
                     "preset:climb",
                     "preset:jump",
                     "preset:slash",
@@ -371,7 +429,17 @@ class TripoAnimateRetargetNode:
                     "preset:hurt",
                     "preset:fall",
                     "preset:turn",
+                    "preset:quadruped:walk",
+                    "preset:hexapod:walk",
+                    "preset:octopod:walk",
+                    "preset:serpentine:march",
+                    "preset:aquatic:march"
                 ],),
+                "out_format": (["glb", "fbx"], {"default": "glb"}),
+            },
+            "optional": {
+                "bake_animation": ("BOOLEAN", {"default": True}),
+                "export_with_geometry": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -380,17 +448,17 @@ class TripoAnimateRetargetNode:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, model_info, animation):
+    def generate_mesh(self, model_info, animation, out_format, bake_animation=True, export_with_geometry=False):
         client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
             async with client:
-                animation_enum = Animation(animation)
                 task_id = await client.retarget_animation(
                     original_model_task_id=model_info["task_id"],
-                    animation=animation_enum,
-                    out_format="glb",
-                    bake_animation=True
+                    animation=animation,
+                    out_format=out_format,
+                    bake_animation=bake_animation,
+                    export_with_geometry=export_with_geometry
                 )
                 task = await client.wait_for_task(task_id, verbose=True)
                 if task.status == "success":
@@ -419,9 +487,17 @@ class TripoConvertNode:
             },
             "optional": {
                 "quad": ("BOOLEAN", {"default": False}),
-                "face_limit": ("INT", {"min": -1, "max": 500000, "default": -1}),
+                "force_symmetry": ("BOOLEAN", {"default": False}),
+                "face_limit": ("INT", {"min": -1, "max": 500000, "default": 10000}),
+                "flatten_bottom": ("BOOLEAN", {"default": False}),
+                "flatten_bottom_threshold": ("FLOAT", {"default": 0.01, "min": 0.0, "max": 1.0}),
                 "texture_size": ("INT", {"min": 128, "max": 4096, "default": 4096}),
-                "texture_format": (["BMP", "DPX", "HDR", "JPEG", "OPEN_EXR", "PNG", "TARGA", "TIFF", "WEBP"], {"default": "JPEG"})
+                "texture_format": (["BMP", "DPX", "HDR", "JPEG", "OPEN_EXR", "PNG", "TARGA", "TIFF", "WEBP"], {"default": "JPEG"}),
+                "pivot_to_center_bottom": ("BOOLEAN", {"default": False}),
+                "with_animation": ("BOOLEAN", {"default": False}),
+                "pack_uv": ("BOOLEAN", {"default": False}),
+                "bake": ("BOOLEAN", {"default": True}),
+                "part_names": ("STRING", {"multiline": True}),
             }
         }
 
@@ -430,18 +506,32 @@ class TripoConvertNode:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, model_info, format, quad, face_limit, texture_size, texture_format):
+    def generate_mesh(self, model_info, format, quad=False, force_symmetry=False, face_limit=10000,
+                     flatten_bottom=False, flatten_bottom_threshold=0.01, texture_size=4096,
+                     texture_format="JPEG", pivot_to_center_bottom=False, with_animation=False,
+                     pack_uv=False, bake=True, part_names=None):
         client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
             async with client:
+                # Handle part names
+                part_names_list = part_names.split('\n') if part_names else None
+
                 task_id = await client.convert_model(
                     original_model_task_id=model_info["task_id"],
                     format=format,
                     quad=quad,
+                    force_symmetry=force_symmetry,
                     face_limit=face_limit,
+                    flatten_bottom=flatten_bottom,
+                    flatten_bottom_threshold=flatten_bottom_threshold,
                     texture_size=texture_size,
-                    texture_format=texture_format
+                    texture_format=texture_format,
+                    pivot_to_center_bottom=pivot_to_center_bottom,
+                    with_animation=with_animation,
+                    pack_uv=pack_uv,
+                    bake=bake,
+                    part_names=part_names_list
                 )
                 task = await client.wait_for_task(task_id, verbose=True)
                 if task.status == "success":
@@ -454,6 +544,187 @@ class TripoConvertNode:
 
         return asyncio.run(process())
 
+class TripoMeshSegmentation:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "model_info": ("MODEL_INFO",),
+                "model_version": (["v1.0-20250506"], {"default": "v1.0-20250506"}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    def generate_mesh(self, model_info, model_version):
+        client, key = GetTripoAPI(model_info["apikey"])
+
+        async def process():
+            async with client:
+                task_id = await client.mesh_segmentation(
+                    original_model_task_id=model_info["task_id"],
+                    model_version=model_version
+                )
+                task = await client.wait_for_task(task_id, verbose=True)
+                if task.status == "success":
+                    downloaded = await client.download_task_models(task, get_output_directory())
+                    model_file = next(iter(downloaded.values()))
+                    print(f"model_file: {model_file}")
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": model_info["file_prefix"],
+                            "output_directory": model_info["output_directory"]
+                        }
+                else:
+                    raise RuntimeError(f"Failed to segment mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+
+        return asyncio.run(process())
+
+class TripoMeshCompletion:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "model_info": ("MODEL_INFO",),
+                "model_version": (["v1.0-20250506"], {"default": "v1.0-20250506"}),
+            },
+            "optional": {
+                "part_names": ("STRING", {"multiline": True}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    def generate_mesh(self, model_info, model_version, part_names=None):
+        client, key = GetTripoAPI(model_info["apikey"])
+
+        async def process():
+            async with client:
+                part_names_list = part_names.split('\n') if part_names else None
+                task_id = await client.mesh_completion(
+                    original_model_task_id=model_info["task_id"],
+                    model_version=model_version,
+                    part_names=part_names_list
+                )
+                task = await client.wait_for_task(task_id, verbose=True)
+                if task.status == "success":
+                    downloaded = await client.download_task_models(task, get_output_directory())
+                    model_file = next(iter(downloaded.values()))
+                    print(f"model_file: {model_file}")
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": model_info["file_prefix"],
+                            "output_directory": model_info["output_directory"]
+                        }
+                else:
+                    raise RuntimeError(f"Failed to complete mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+
+        return asyncio.run(process())
+
+class TripoSmartLowPoly:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "model_info": ("MODEL_INFO",),
+                "model_version": (["P-v1.0-20250506"], {"default": "P-v1.0-20250506"}),
+            },
+            "optional": {
+                "quad": ("BOOLEAN", {"default": False}),
+                "part_names": ("STRING", {"multiline": True}),
+                "face_limit": ("INT", {"min": -1, "max": 500000, "default": 4000}),
+                "bake": ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    def generate_mesh(self, model_info, model_version, quad=False, part_names=None, face_limit=4000, bake=True):
+        client, key = GetTripoAPI(model_info["apikey"])
+
+        async def process():
+            async with client:
+                part_names_list = part_names.split('\n') if part_names else None
+                task_id = await client.smart_lowpoly(
+                    original_model_task_id=model_info["task_id"],
+                    model_version=model_version,
+                    quad=quad,
+                    part_names=part_names_list,
+                    face_limit=face_limit,
+                    bake=bake
+                )
+                task = await client.wait_for_task(task_id, verbose=True)
+                if task.status == "success":
+                    downloaded = await client.download_task_models(task, get_output_directory())
+                    model_file = next(iter(downloaded.values()))
+                    print(f"model_file: {model_file}")
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": model_info["file_prefix"],
+                            "output_directory": model_info["output_directory"]
+                        }
+                else:
+                    raise RuntimeError(f"Failed to generate low poly mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+
+        return asyncio.run(process())
+
+class TripoStylizeModel:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "model_info": ("MODEL_INFO",),
+                "style": (["lego", "voxel", "voronoi", "minecraft"],),
+                "block_size": ("INT", {"default": 80, "min": 1, "max": 1000}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    def generate_mesh(self, model_info, style, block_size):
+        client, key = GetTripoAPI(model_info["apikey"])
+
+        async def process():
+            async with client:
+                task_id = await client.stylize_model(
+                    original_model_task_id=model_info["task_id"],
+                    style=style,
+                    block_size=block_size
+                )
+                task = await client.wait_for_task(task_id, verbose=True)
+                if task.status == "success":
+                    downloaded = await client.download_task_models(task, get_output_directory())
+                    model_file = next(iter(downloaded.values()))
+                    print(f"model_file: {model_file}")
+                    return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                        {
+                            "task_id": task_id,
+                            "apikey": key,
+                            "file_prefix": model_info["file_prefix"],
+                            "output_directory": model_info["output_directory"]
+                        }
+                else:
+                    raise RuntimeError(f"Failed to stylize mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+
+        return asyncio.run(process())
 
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
@@ -462,6 +733,10 @@ NODE_CLASS_MAPPINGS = {
     "TripoAnimateRigNode": TripoAnimateRigNode,
     "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
     "TripoConvertNode": TripoConvertNode,
+    "TripoMeshSegmentation": TripoMeshSegmentation,
+    "TripoMeshCompletion": TripoMeshCompletion,
+    "TripoSmartLowPoly": TripoSmartLowPoly,
+    "TripoStylizeModel": TripoStylizeModel,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -471,4 +746,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoAnimateRigNode": "Tripo: Rig model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
     "TripoConvertNode": "Tripo: Convert model",
+    "TripoMeshSegmentation": "Tripo: Segment mesh",
+    "TripoMeshCompletion": "Tripo: Complete mesh",
+    "TripoSmartLowPoly": "Tripo: Smart low poly",
+    "TripoStylizeModel": "Tripo: Stylize model",
 }
