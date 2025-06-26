@@ -361,6 +361,7 @@ class TripoAnimateRigNode:
         return {
             "required": {
                 "model_info": ("MODEL_INFO",),
+                "model_version": (["v1.0-20240301", "v2.0-20250506"], {"default": "v2.0-20250506"}),
                 "out_format": (["glb", "fbx"], {"default": "glb"}),
                 "spec": (["mixamo", "tripo"], {"default": "tripo"}),
             }
@@ -371,7 +372,7 @@ class TripoAnimateRigNode:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    def generate_mesh(self, model_info, out_format, spec):
+    def generate_mesh(self, model_info, model_version, out_format, spec):
         client, key = GetTripoAPI(model_info["apikey"])
 
         async def process():
@@ -392,7 +393,8 @@ class TripoAnimateRigNode:
                     original_model_task_id=model_info["task_id"],
                     out_format=out_format,
                     rig_type=rig_type,
-                    spec=spec
+                    spec=spec,
+                    model_version=model_version
                 )
                 task = await client.wait_for_task(task_id, verbose=True)
                 if task.status == "success":
