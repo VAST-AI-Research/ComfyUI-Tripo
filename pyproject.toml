@@ -1,9 +1,9 @@
 [project]
 name = "comfyui-tripo"
 description = "Custom nodes for using [a/Tripo](https://www.tripo3d.ai/) in ComfyUI to create 3D from text and image prompts."
-version = "1.2.2"
+version = "1.2.3"
 license = { file = "LICENSE" }
-dependencies = ["tripo3d>=0.3.1"]
+dependencies = ["tripo3d>=0.3.3"]
 
 [project.urls]
 Repository = "https://github.com/VAST-AI-Research/ComfyUI-Tripo"
