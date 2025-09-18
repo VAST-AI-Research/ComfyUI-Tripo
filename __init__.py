@@ -105,7 +105,7 @@ class TripoAPIDraft:
                 "image_left": ("IMAGE",),
                 "image_back": ("IMAGE",),
                 "image_right": ("IMAGE",),
-                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123"], {"default": "v2.5-20250123"}),
+                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123", "v3.0-20250812"], {"default": "v2.5-20250123"}),
                 "style": (["None", "person:person2cartoon", "animal:venom", "object:clay", "object:steampunk",
                            "object:barbie", "object:christmas", "gold", "ancient_bronze"], {"default": "None"}),
                 "texture": ("BOOLEAN", {"default": True}),
@@ -188,6 +188,8 @@ class TripoAPIDraft:
             elif mode == 'multiview_to_model':
                 if image is None:
                     raise RuntimeError("front image for multiview is required")
+                if model_version == "v3.0-20250812":
+                    raise RuntimeError("v3.0-20250812 for multiview is not supported yet")
                 images = []
                 image_dict = {
                     "image": image,
@@ -243,6 +245,7 @@ class TripoTextureModel:
                 "model_info": ("MODEL_INFO",),
             },
             "optional": {
+                "model_version": (["v2.5-20250123", "v3.0-20250812"], {"default": "v3.0-20250812"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "texture_seed": ("INT", {"default": 42}),
@@ -262,7 +265,7 @@ class TripoTextureModel:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    async def generate_mesh(self, model_info, texture=None, pbr=None, texture_seed=None, texture_quality=None,
+    async def generate_mesh(self, model_info, model_version, texture=None, pbr=None, texture_seed=None, texture_quality=None,
                      texture_alignment=None, text_prompt=None, image_prompt=None, style_image=None,
                      part_names=None, compress=None, bake=None):
         client, key = GetTripoAPI(model_info["apikey"])
@@ -282,6 +285,7 @@ class TripoTextureModel:
 
             task_id = await client.texture_model(
                 original_model_task_id=model_info["task_id"],
+                model_version=model_version,
                 texture=texture,
                 pbr=pbr,
                 texture_seed=texture_seed,
