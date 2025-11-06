@@ -190,8 +190,6 @@ class TripoAPIDraft:
             elif mode == 'multiview_to_model':
                 if image is None:
                     raise RuntimeError("front image for multiview is required")
-                if model_version == "v3.0-20250812":
-                    raise RuntimeError("v3.0-20250812 for multiview is not supported yet")
                 images = []
                 image_dict = {
                     "image": image,
