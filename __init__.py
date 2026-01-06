@@ -157,7 +157,7 @@ class TripoAPIDraft:
                     model_seed=model_seed,
                     texture_seed=texture_seed,
                     texture_quality=texture_quality,
-                    face_limit=face_limit,
+                    face_limit=face_limit if face_limit > 0 else None,
                     quad=quad,
                     compress=compress,
                     generate_parts=generate_parts,
@@ -179,7 +179,7 @@ class TripoAPIDraft:
                     texture_quality=texture_quality,
                     geometry_quality=geometry_quality,
                     texture_alignment=texture_alignment,
-                    face_limit=face_limit,
+                    face_limit=face_limit if face_limit > 0 else None,
                     quad=quad,
                     compress=compress,
                     generate_parts=generate_parts,
@@ -213,7 +213,7 @@ class TripoAPIDraft:
                     texture_seed=texture_seed,
                     texture_quality=texture_quality,
                     texture_alignment=texture_alignment,
-                    face_limit=face_limit,
+                    face_limit=face_limit if face_limit > 0 else None,
                     quad=quad,
                     compress=compress,
                     generate_parts=generate_parts,
@@ -235,7 +235,7 @@ class TripoAPIDraft:
                         "output_directory": output_directory
                     }
             else:
-                raise RuntimeError(f"Failed to generate mesh: {task.error}")
+                raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoTextureModel:
     @classmethod
@@ -311,7 +311,7 @@ class TripoTextureModel:
                         "output_directory": model_info["output_directory"]
                     }
             else:
-                raise RuntimeError(f"Failed to generate mesh: {task.error}")
+                raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 
 class TripoRefineModel:
@@ -628,12 +628,12 @@ class TripoSmartLowPoly:
         return {
             "required": {
                 "model_info": ("MODEL_INFO",),
-                "model_version": (["P-v1.0-20250506"], {"default": "P-v1.0-20250506"}),
+                "model_version": (["P-v2.0-20251225"], {"default": "P-v2.0-20251225"}),
             },
             "optional": {
                 "quad": ("BOOLEAN", {"default": False}),
                 "part_names": ("STRING", {"multiline": True}),
-                "face_limit": ("INT", {"min": -1, "max": 500000, "default": 4000}),
+                "face_limit": ("INT", {"min": -1, "max": 20000, "default": 10000}),
                 "bake": ("BOOLEAN", {"default": True}),
             }
         }
@@ -643,7 +643,7 @@ class TripoSmartLowPoly:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    async def generate_mesh(self, model_info, model_version, quad=False, part_names=None, face_limit=4000, bake=True):
+    async def generate_mesh(self, model_info, model_version, quad=False, part_names=None, face_limit=10000, bake=True):
         client, key = GetTripoAPI(model_info["apikey"])
 
         async with client:
