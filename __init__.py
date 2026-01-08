@@ -106,8 +106,6 @@ class TripoAPIDraft:
                 "image_back": ("IMAGE",),
                 "image_right": ("IMAGE",),
                 "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123", "v3.0-20250812"], {"default": "v2.5-20250123"}),
-                "style": (["None", "person:person2cartoon", "animal:venom", "object:clay", "object:steampunk",
-                           "object:barbie", "object:christmas", "gold", "ancient_bronze"], {"default": "None"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "image_seed": ("INT", {"default": 42}),
@@ -136,13 +134,12 @@ class TripoAPIDraft:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, mode, prompt=None, negative_prompt=None, image=None, image_left=None, image_back=None, image_right=None,
-                      apikey=None, model_version=None, texture=None, pbr=None, style=None,
+                      apikey=None, model_version=None, texture=None, pbr=None,
                       image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, geometry_quality=None, texture_alignment=None,
                       face_limit=None, quad=None, compress=None, generate_parts=None, smart_low_poly=None,
                       auto_size=None, orientation=None, file_prefix=None, output_directory=None):
         client, key = GetTripoAPI(apikey)
         async with client:
-            style_enum = None if style == "None" else ModelStyle(style)
             if mode == "text_to_model":
                 if not prompt:
                     raise RuntimeError("Prompt is required")
@@ -150,7 +147,6 @@ class TripoAPIDraft:
                     prompt=prompt,
                     negative_prompt=negative_prompt,
                     model_version=model_version,
-                    style=style_enum,
                     texture=texture,
                     pbr=pbr,
                     image_seed=image_seed,
@@ -171,7 +167,6 @@ class TripoAPIDraft:
                 task_id = await client.image_to_model(
                     image=image_path,
                     model_version=model_version,
-                    style=style_enum,
                     texture=texture,
                     pbr=pbr,
                     model_seed=model_seed,
