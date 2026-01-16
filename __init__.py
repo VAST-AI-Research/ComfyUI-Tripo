@@ -497,10 +497,10 @@ class TripoConvertNode:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    async def generate_mesh(self, model_info, format, quad=False, force_symmetry=False, face_limit=10000,
+    async def generate_mesh(self, model_info, format, quad=False, force_symmetry=False, face_limit=-1,
                      flatten_bottom=False, flatten_bottom_threshold=0.01, texture_size=4096,
-                     texture_format="JPEG", pivot_to_center_bottom=False, with_animation=False,
-                     pack_uv=False, bake=True, part_names=None, fbx_preset=None, export_vertex_colors=False, export_orientation=None, animate_in_place=False):
+                     texture_format="JPEG", pivot_to_center_bottom=False, scale_factor=1.0, with_animation=True,
+                     pack_uv=False, bake=True, part_names=None, fbx_preset="blender", export_vertex_colors=False, export_orientation="+x", animate_in_place=False):
         client, key = GetTripoAPI(model_info["apikey"])
 
         async with client:
@@ -518,6 +518,7 @@ class TripoConvertNode:
                 texture_size=texture_size,
                 texture_format=texture_format,
                 pivot_to_center_bottom=pivot_to_center_bottom,
+                scale_factor=scale_factor,
                 with_animation=with_animation,
                 pack_uv=pack_uv,
                 bake=bake,
