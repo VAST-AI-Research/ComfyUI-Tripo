@@ -2,7 +2,7 @@ import os
 import json
 
 from folder_paths import get_input_directory, get_output_directory
-from tripo3d import TripoClient, ModelStyle, Animation
+from tripo3d import TripoClient, Animation
 import asyncio
 
 tripo_api_key = os.environ.get("TRIPO_API_KEY")
@@ -105,7 +105,7 @@ class TripoAPIDraft:
                 "image_left": ("IMAGE",),
                 "image_back": ("IMAGE",),
                 "image_right": ("IMAGE",),
-                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123", "v3.0-20250812"], {"default": "v2.5-20250123"}),
+                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123", "v3.0-20250812", "v3.1-20260211"], {"default": "v3.1-20260211"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "image_seed": ("INT", {"default": 42}),
