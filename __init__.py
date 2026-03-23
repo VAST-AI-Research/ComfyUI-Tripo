@@ -2,8 +2,7 @@ import os
 import json
 
 from folder_paths import get_input_directory, get_output_directory
-from tripo3d import TripoClient, ModelStyle, Animation
-import asyncio
+from tripo3d import TripoClient
 
 tripo_api_key = os.environ.get("TRIPO_API_KEY")
 if not tripo_api_key:
@@ -15,13 +14,26 @@ if not tripo_api_key:
 # global tripo_client
 tripo_client = None  # Initialize the variable to None
 
-def GetTripoAPI(apikey: str):
+async def GetTripoAPI(apikey: str):
     global tripo_client
-    apikey = tripo_api_key if tripo_api_key else apikey
+    if not apikey:
+        apikey = tripo_api_key
     if not apikey:
         raise RuntimeError("TRIPO API key is required")
     if tripo_client is None:
-        tripo_client = TripoClient(api_key=apikey)
+        balance = None
+        for is_global in [True, False]:
+            print(apikey)
+            tripo_client = TripoClient(api_key=apikey, IS_GLOBAL=is_global)
+            try:
+                balance = await tripo_client.get_balance()
+                print(f"Tripo API balance: {balance}")
+                break
+            except:
+                print(f'Failed to get Tripo API balance, trying again with global={is_global}')
+                pass
+        if balance is None:
+            raise RuntimeError("Failed to get Tripo API balance")
     return tripo_client, apikey
 
 
@@ -105,7 +117,7 @@ class TripoAPIDraft:
                 "image_left": ("IMAGE",),
                 "image_back": ("IMAGE",),
                 "image_right": ("IMAGE",),
-                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123", "v3.0-20250812"], {"default": "v2.5-20250123"}),
+                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123", "v3.0-20250812", "v3.1-20260211"], {"default": "v3.1-20260211"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "image_seed": ("INT", {"default": 42}),
@@ -138,7 +150,7 @@ class TripoAPIDraft:
                       image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, geometry_quality=None, texture_alignment=None,
                       face_limit=None, quad=None, compress=None, generate_parts=None, smart_low_poly=None,
                       auto_size=None, orientation=None, file_prefix=None, output_directory=None):
-        client, key = GetTripoAPI(apikey)
+        client, key = await GetTripoAPI(apikey)
         async with client:
             if mode == "text_to_model":
                 if not prompt:
@@ -263,7 +275,7 @@ class TripoTextureModel:
     async def generate_mesh(self, model_info, model_version, texture=None, pbr=None, texture_seed=None, texture_quality=None,
                      texture_alignment=None, text_prompt=None, image_prompt=None, style_image=None,
                      part_names=None, compress=None, bake=None):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             # Handle image inputs
@@ -324,7 +336,7 @@ class TripoRefineModel:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             task_id = await client.refine_model(
@@ -363,7 +375,7 @@ class TripoAnimateRigNode:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, model_version, out_format, spec):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             # First check if model can be rigged
@@ -438,7 +450,7 @@ class TripoAnimateRetargetNode:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, animation, out_format, bake_animation=True, export_with_geometry=False):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             task_id = await client.retarget_animation(
@@ -501,7 +513,7 @@ class TripoConvertNode:
                      flatten_bottom=False, flatten_bottom_threshold=0.01, texture_size=4096,
                      texture_format="JPEG", pivot_to_center_bottom=False, scale_factor=1.0, with_animation=True,
                      pack_uv=False, bake=True, part_names=None, fbx_preset="blender", export_vertex_colors=False, export_orientation="+x", animate_in_place=False):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             # Handle part names
@@ -553,7 +565,7 @@ class TripoMeshSegmentation:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, model_version):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             task_id = await client.mesh_segmentation(
@@ -594,7 +606,7 @@ class TripoMeshCompletion:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, model_version, part_names=None):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             part_names_list = part_names.split('\n') if part_names else None
@@ -640,7 +652,7 @@ class TripoSmartLowPoly:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, model_version, quad=False, part_names=None, face_limit=10000, bake=True):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             part_names_list = part_names.split('\n') if part_names else None
@@ -684,7 +696,7 @@ class TripoStylizeModel:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, style, block_size):
-        client, key = GetTripoAPI(model_info["apikey"])
+        client, key = await GetTripoAPI(model_info["apikey"])
 
         async with client:
             task_id = await client.stylize_model(
