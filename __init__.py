@@ -7,9 +7,11 @@ from tripo3d import TripoClient
 tripo_api_key = os.environ.get("TRIPO_API_KEY")
 if not tripo_api_key:
     p = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(p, 'config.json')) as f:
-        config = json.load(f)
-        tripo_api_key = config["TRIPO_API_KEY"]
+    config_path = os.path.join(p, 'config.json')
+    if os.path.exists(config_path):
+        with open(config_path) as f:
+            config = json.load(f)
+            tripo_api_key = config["TRIPO_API_KEY"]
 
 # global tripo_client
 tripo_client = None  # Initialize the variable to None
@@ -23,7 +25,6 @@ async def GetTripoAPI(apikey: str):
     if tripo_client is None:
         balance = None
         for is_global in [True, False]:
-            print(apikey)
             tripo_client = TripoClient(api_key=apikey, IS_GLOBAL=is_global)
             try:
                 balance = await tripo_client.get_balance()
@@ -33,6 +34,7 @@ async def GetTripoAPI(apikey: str):
                 print(f'Failed to get Tripo API balance, trying again with global={is_global}')
                 pass
         if balance is None:
+            tripo_client = None
             raise RuntimeError("Failed to get Tripo API balance")
     return tripo_client, apikey
 
@@ -719,6 +721,57 @@ class TripoStylizeModel:
             else:
                 raise RuntimeError(f"Failed to stylize mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
+class TripoImportModel:
+    @classmethod
+    def INPUT_TYPES(s):
+        from folder_paths import get_input_directory, filter_files_content_types
+        input_dir = get_input_directory()
+        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        files = filter_files_content_types(files, ["model"])
+        return {
+            "required": {
+                "model_file": (sorted(files), {}),
+            },
+            "optional": {
+                "apikey": ("STRING", {"default": ""}),
+                "file_prefix": ("STRING", {"default": ""}),
+                "output_directory": ("STRING", {"default": ""}),
+            }
+        }
+
+    RETURN_TYPES = ("MODEL_INFO",)
+    RETURN_NAMES = ("model_info",)
+    FUNCTION = "import_model"
+    CATEGORY = "TripoAPI"
+
+    async def import_model(self, model_file, apikey=None, file_prefix=None, output_directory=None):
+        from folder_paths import get_annotated_filepath
+
+        if not model_file:
+            raise RuntimeError("Model file is required")
+
+        file_path = get_annotated_filepath(model_file)
+
+        if not os.path.exists(file_path):
+            raise RuntimeError(f"File does not exist: {file_path}")
+
+        client, key = await GetTripoAPI(apikey)
+
+        async with client:
+            task_id = await client.import_model(file=file_path)
+            task = await client.wait_for_task(task_id, verbose=True)
+
+            if task.status == "success":
+                print(f"Model imported successfully. Task ID: {task_id}")
+                return ({
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": file_prefix if file_prefix else "",
+                    "output_directory": output_directory if output_directory else ""
+                },)
+            else:
+                raise RuntimeError(f"Failed to import model: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
     "TripoTextureModel": TripoTextureModel,
@@ -730,6 +783,7 @@ NODE_CLASS_MAPPINGS = {
     "TripoMeshCompletion": TripoMeshCompletion,
     "TripoSmartLowPoly": TripoSmartLowPoly,
     "TripoStylizeModel": TripoStylizeModel,
+    "TripoImportModel": TripoImportModel,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -743,4 +797,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoMeshCompletion": "Tripo: Complete mesh",
     "TripoSmartLowPoly": "Tripo: Smart low poly",
     "TripoStylizeModel": "Tripo: Stylize model",
+    "TripoImportModel": "Tripo: Import model",
 }
+
+WEB_DIRECTORY = "./web"
