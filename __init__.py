@@ -1,5 +1,7 @@
 import os
 import json
+import uuid
+import urllib.request
 
 from folder_paths import get_input_directory, get_output_directory
 from tripo3d import TripoClient
@@ -557,7 +559,13 @@ class TripoMeshSegmentation:
         return {
             "required": {
                 "model_info": ("MODEL_INFO",),
-                "model_version": (["v1.0-20250506"], {"default": "v1.0-20250506"}),
+                "model_version": (["v1.0-20250506", "v2.0-20260430"], {"default": "v1.0-20250506"}),
+            },
+            "optional": {
+                "segmentation_granularity": (["simple", "balanced", "detailed"], {"default": "balanced"}),
+                "ref_image": ("IMAGE",),
+                "split_by_connectivity": ("BOOLEAN", {"default": True}),
+                "apikey": ("STRING", {"default": ""}),
             }
         }
 
@@ -566,15 +574,38 @@ class TripoMeshSegmentation:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    async def generate_mesh(self, model_info, model_version):
-        client, key = await GetTripoAPI(model_info["apikey"])
+    async def generate_mesh(
+        self,
+        model_info,
+        model_version,
+        segmentation_granularity=None,
+        ref_image=None,
+        split_by_connectivity=None,
+        apikey=None,
+    ):
+        client, key = await GetTripoAPI(apikey or model_info.get("apikey"))
 
         async with client:
+            kwargs = {}
+            is_v2 = model_version == "v2.0-20260430"
+            if is_v2:
+                if segmentation_granularity:
+                    kwargs["segmentation_granularity"] = segmentation_granularity
+                if split_by_connectivity is not None:
+                    kwargs["split_by_connectivity"] = split_by_connectivity
+                if ref_image is not None:
+                    img_path = save_tensor(
+                        ref_image,
+                        os.path.join(get_input_directory(), f"segment_ref_{uuid.uuid4().hex[:8]}"),
+                    )
+                    kwargs["ref_image"] = img_path
+
             task_id = await client.mesh_segmentation(
                 original_model_task_id=model_info["task_id"],
-                model_version=model_version
+                model_version=model_version,
+                **kwargs
             )
-            task = await client.wait_for_task(task_id, verbose=True)
+            task = await client.wait_for_task(task_id, verbose=True, use_v3=is_v2)
             if task.status == "success":
                 downloaded = await client.download_task_models(task, get_output_directory())
                 model_file = next(iter(downloaded.values()))
@@ -733,6 +764,7 @@ class TripoImportModel:
                 "model_file": (sorted(files), {}),
             },
             "optional": {
+                "model_url": ("STRING", {"default": ""}),
                 "apikey": ("STRING", {"default": ""}),
                 "file_prefix": ("STRING", {"default": ""}),
                 "output_directory": ("STRING", {"default": ""}),
@@ -744,16 +776,31 @@ class TripoImportModel:
     FUNCTION = "import_model"
     CATEGORY = "TripoAPI"
 
-    async def import_model(self, model_file, apikey=None, file_prefix=None, output_directory=None):
+    async def import_model(
+        self,
+        model_file,
+        apikey=None,
+        file_prefix=None,
+        output_directory=None,
+        model_url=None,
+    ):
         from folder_paths import get_annotated_filepath
 
-        if not model_file:
-            raise RuntimeError("Model file is required")
+        if model_url and model_url.strip():
+            ext = os.path.splitext(model_url.split("?")[0])[-1] or ".glb"
+            file_path = os.path.join(
+                get_input_directory(),
+                f"url_import_{uuid.uuid4().hex[:8]}{ext}",
+            )
+            urllib.request.urlretrieve(model_url.strip(), file_path)
+        else:
+            if not model_file:
+                raise RuntimeError("Model file is required when model_url is empty")
 
-        file_path = get_annotated_filepath(model_file)
+            file_path = get_annotated_filepath(model_file)
 
-        if not os.path.exists(file_path):
-            raise RuntimeError(f"File does not exist: {file_path}")
+            if not os.path.exists(file_path):
+                raise RuntimeError(f"File does not exist: {file_path}")
 
         client, key = await GetTripoAPI(apikey)
 
