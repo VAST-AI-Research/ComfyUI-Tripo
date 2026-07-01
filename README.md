@@ -2,6 +2,7 @@
 This extension integrates Tripo into ComfyUI, allowing users to generate 3D models from text prompts or images directly within the ComfyUI interface.
 
 ## ChangeLog
+- 20260630: support Mesh Segmentation v2.0; support `model_url` for direct URL import
 - 20260528: add import model
 - 20250619: update to the newest api; add more nodes
 - 20250331: use tripo3d package
@@ -14,7 +15,9 @@ This extension integrates Tripo into ComfyUI, allowing users to generate 3D mode
 ## Features
 - Generate 3D models from text prompts
 - Generate 3D models from images
-- Animate 3d models
+- Import models from URL (`model_url`)
+- Mesh Segmentation (v1 and v2.0)
+- Animate 3D models
 - Convert format and retopologize
 
 ## Installation
