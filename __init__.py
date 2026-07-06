@@ -758,14 +758,17 @@ class TripoImportModel:
         from folder_paths import get_input_directory, filter_files_content_types
         input_dir = get_input_directory()
         files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
-        files = filter_files_content_types(files, ["model"])
+        model_files = filter_files_content_types(files, ["model"])
+        model_3d_extensions = {'.glb', '.gltf', '.obj', '.fbx', '.stl', '.ply', '.zip'}
+        model_3d_files = [f for f in files if os.path.splitext(f)[1].lower() in model_3d_extensions]
+        all_model_files = sorted(set(model_files + model_3d_files))
         return {
             "required": {
-                "model_file": (sorted(files), {}),
+                "apikey": ("STRING", {"default": ""}),
             },
             "optional": {
+                "model_file": (["none"] + all_model_files, {"default": "none"}),
                 "model_url": ("STRING", {"default": ""}),
-                "apikey": ("STRING", {"default": ""}),
                 "file_prefix": ("STRING", {"default": ""}),
                 "output_directory": ("STRING", {"default": ""}),
             }
@@ -778,8 +781,8 @@ class TripoImportModel:
 
     async def import_model(
         self,
-        model_file,
-        apikey=None,
+        apikey,
+        model_file=None,
         file_prefix=None,
         output_directory=None,
         model_url=None,
@@ -793,14 +796,13 @@ class TripoImportModel:
                 f"url_import_{uuid.uuid4().hex[:8]}{ext}",
             )
             urllib.request.urlretrieve(model_url.strip(), file_path)
-        else:
-            if not model_file:
-                raise RuntimeError("Model file is required when model_url is empty")
-
+        elif model_file and model_file != "none":
             file_path = get_annotated_filepath(model_file)
 
             if not os.path.exists(file_path):
                 raise RuntimeError(f"File does not exist: {file_path}")
+        else:
+            raise RuntimeError("Either model_file or model_url must be provided")
 
         client, key = await GetTripoAPI(apikey)
 
