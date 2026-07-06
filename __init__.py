@@ -155,98 +155,97 @@ class TripoAPIDraft:
                       face_limit=None, quad=None, compress=None, generate_parts=None, smart_low_poly=None,
                       auto_size=None, orientation=None, file_prefix=None, output_directory=None):
         client, key = await GetTripoAPI(apikey)
-        async with client:
-            if mode == "text_to_model":
-                if not prompt:
-                    raise RuntimeError("Prompt is required")
-                task_id = await client.text_to_model(
-                    prompt=prompt,
-                    negative_prompt=negative_prompt,
-                    model_version=model_version,
-                    texture=texture,
-                    pbr=pbr,
-                    image_seed=image_seed,
-                    model_seed=model_seed,
-                    texture_seed=texture_seed,
-                    texture_quality=texture_quality,
-                    face_limit=face_limit if face_limit > 0 else None,
-                    quad=quad,
-                    compress=compress,
-                    generate_parts=generate_parts,
-                    smart_low_poly=smart_low_poly,
-                    auto_size=auto_size
-                )
-            elif mode == 'image_to_model':
-                if image is None:
-                    raise RuntimeError("Image is required")
-                image_path = save_tensor(image, os.path.join(get_input_directory(), "image"))
-                task_id = await client.image_to_model(
-                    image=image_path,
-                    model_version=model_version,
-                    texture=texture,
-                    pbr=pbr,
-                    model_seed=model_seed,
-                    texture_seed=texture_seed,
-                    texture_quality=texture_quality,
-                    geometry_quality=geometry_quality,
-                    texture_alignment=texture_alignment,
-                    face_limit=face_limit if face_limit > 0 else None,
-                    quad=quad,
-                    compress=compress,
-                    generate_parts=generate_parts,
-                    smart_low_poly=smart_low_poly,
-                    auto_size=auto_size,
-                    orientation=orientation
-                )
-            elif mode == 'multiview_to_model':
-                if image is None:
-                    raise RuntimeError("front image for multiview is required")
-                images = []
-                image_dict = {
-                    "image": image,
-                    "image_left": image_left,
-                    "image_back": image_back,
-                    "image_right": image_right
-                }
-                for image_name in ["image", "image_left", "image_back", "image_right"]:
-                    image_ = image_dict[image_name]
-                    if image_ is not None:
-                        image_filename = save_tensor(image_, os.path.join(get_input_directory(), image_name))
-                        images.append(image_filename)
-                    else:
-                        images.append(None)
-                task_id = await client.multiview_to_model(
-                    images=images,
-                    model_version=model_version,
-                    texture=texture,
-                    pbr=pbr,
-                    model_seed=model_seed,
-                    texture_seed=texture_seed,
-                    texture_quality=texture_quality,
-                    texture_alignment=texture_alignment,
-                    face_limit=face_limit if face_limit > 0 else None,
-                    quad=quad,
-                    compress=compress,
-                    generate_parts=generate_parts,
-                    smart_low_poly=smart_low_poly,
-                    auto_size=auto_size,
-                    orientation=orientation
-                )
+        if mode == "text_to_model":
+            if not prompt:
+                raise RuntimeError("Prompt is required")
+            task_id = await client.text_to_model(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                model_version=model_version,
+                texture=texture,
+                pbr=pbr,
+                image_seed=image_seed,
+                model_seed=model_seed,
+                texture_seed=texture_seed,
+                texture_quality=texture_quality,
+                face_limit=face_limit if face_limit > 0 else None,
+                quad=quad,
+                compress=compress,
+                generate_parts=generate_parts,
+                smart_low_poly=smart_low_poly,
+                auto_size=auto_size
+            )
+        elif mode == 'image_to_model':
+            if image is None:
+                raise RuntimeError("Image is required")
+            image_path = save_tensor(image, os.path.join(get_input_directory(), "image"))
+            task_id = await client.image_to_model(
+                image=image_path,
+                model_version=model_version,
+                texture=texture,
+                pbr=pbr,
+                model_seed=model_seed,
+                texture_seed=texture_seed,
+                texture_quality=texture_quality,
+                geometry_quality=geometry_quality,
+                texture_alignment=texture_alignment,
+                face_limit=face_limit if face_limit > 0 else None,
+                quad=quad,
+                compress=compress,
+                generate_parts=generate_parts,
+                smart_low_poly=smart_low_poly,
+                auto_size=auto_size,
+                orientation=orientation
+            )
+        elif mode == 'multiview_to_model':
+            if image is None:
+                raise RuntimeError("front image for multiview is required")
+            images = []
+            image_dict = {
+                "image": image,
+                "image_left": image_left,
+                "image_back": image_back,
+                "image_right": image_right
+            }
+            for image_name in ["image", "image_left", "image_back", "image_right"]:
+                image_ = image_dict[image_name]
+                if image_ is not None:
+                    image_filename = save_tensor(image_, os.path.join(get_input_directory(), image_name))
+                    images.append(image_filename)
+                else:
+                    images.append(None)
+            task_id = await client.multiview_to_model(
+                images=images,
+                model_version=model_version,
+                texture=texture,
+                pbr=pbr,
+                model_seed=model_seed,
+                texture_seed=texture_seed,
+                texture_quality=texture_quality,
+                texture_alignment=texture_alignment,
+                face_limit=face_limit if face_limit > 0 else None,
+                quad=quad,
+                compress=compress,
+                generate_parts=generate_parts,
+                smart_low_poly=smart_low_poly,
+                auto_size=auto_size,
+                orientation=orientation
+            )
 
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, file_prefix, output_directory), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": file_prefix,
-                        "output_directory": output_directory
-                    }
-            else:
-                raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, file_prefix, output_directory), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": file_prefix,
+                    "output_directory": output_directory
+                }
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoTextureModel:
     @classmethod
@@ -281,48 +280,47 @@ class TripoTextureModel:
                      part_names=None, compress=None, bake=None):
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        async with client:
-            # Handle image inputs
-            image_prompt_path = None
-            if image_prompt is not None:
-                image_prompt_path = save_tensor(image_prompt, os.path.join(get_input_directory(), "image_prompt"))
+        # Handle image inputs
+        image_prompt_path = None
+        if image_prompt is not None:
+            image_prompt_path = save_tensor(image_prompt, os.path.join(get_input_directory(), "image_prompt"))
 
-            style_image_path = None
-            if style_image is not None:
-                style_image_path = save_tensor(style_image, os.path.join(get_input_directory(), "style_image"))
+        style_image_path = None
+        if style_image is not None:
+            style_image_path = save_tensor(style_image, os.path.join(get_input_directory(), "style_image"))
 
-            # Handle part names
-            part_names_list = part_names.split('\n') if part_names else None
+        # Handle part names
+        part_names_list = part_names.split('\n') if part_names else None
 
-            task_id = await client.texture_model(
-                original_model_task_id=model_info["task_id"],
-                model_version=model_version,
-                texture=texture,
-                pbr=pbr,
-                texture_seed=texture_seed,
-                texture_quality=texture_quality,
-                texture_alignment=texture_alignment,
-                part_names=part_names_list,
-                compress=compress,
-                bake=bake,
-                text_prompt=text_prompt,
-                image_prompt=image_prompt_path,
-                style_image=style_image_path
-            )
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": model_info["file_prefix"],
-                        "output_directory": model_info["output_directory"]
-                    }
-            else:
-                raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        task_id = await client.texture_model(
+            original_model_task_id=model_info["task_id"],
+            model_version=model_version,
+            texture=texture,
+            pbr=pbr,
+            texture_seed=texture_seed,
+            texture_quality=texture_quality,
+            texture_alignment=texture_alignment,
+            part_names=part_names_list,
+            compress=compress,
+            bake=bake,
+            text_prompt=text_prompt,
+            image_prompt=image_prompt_path,
+            style_image=style_image_path
+        )
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 
 class TripoRefineModel:
@@ -342,24 +340,23 @@ class TripoRefineModel:
     async def generate_mesh(self, model_info):
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        async with client:
-            task_id = await client.refine_model(
-                draft_model_task_id=model_info["task_id"]
-            )
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": model_info["file_prefix"],
-                        "output_directory": model_info["output_directory"]
-                    }
-            else:
-                raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        task_id = await client.refine_model(
+            draft_model_task_id=model_info["task_id"]
+        )
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoAnimateRigNode:
     @classmethod
@@ -381,40 +378,39 @@ class TripoAnimateRigNode:
     async def generate_mesh(self, model_info, model_version, out_format, spec):
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        async with client:
-            # First check if model can be rigged
-            check_task_id = await client.check_riggable(model_info["task_id"])
-            check_result = await client.wait_for_task(check_task_id, verbose=True)
+        # First check if model can be rigged
+        check_task_id = await client.check_riggable(model_info["task_id"])
+        check_result = await client.wait_for_task(check_task_id, verbose=True)
 
-            if not check_result.output.riggable:
-                raise RuntimeError("Model cannot be rigged")
+        if not check_result.output.riggable:
+            raise RuntimeError("Model cannot be rigged")
 
-            # Get the rig type from check result
-            rig_type = check_result.output.rig_type
-            if not rig_type:
-                raise RuntimeError("No suitable rig type found for the model")
+        # Get the rig type from check result
+        rig_type = check_result.output.rig_type
+        if not rig_type:
+            raise RuntimeError("No suitable rig type found for the model")
 
-            task_id = await client.rig_model(
-                original_model_task_id=model_info["task_id"],
-                out_format=out_format,
-                rig_type=rig_type,
-                spec=spec,
-                model_version=model_version
-            )
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": model_info["file_prefix"],
-                        "output_directory": model_info["output_directory"]
-                    }
-            else:
-                raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        task_id = await client.rig_model(
+            original_model_task_id=model_info["task_id"],
+            out_format=out_format,
+            rig_type=rig_type,
+            spec=spec,
+            model_version=model_version
+        )
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoAnimateRetargetNode:
     @classmethod
@@ -456,28 +452,27 @@ class TripoAnimateRetargetNode:
     async def generate_mesh(self, model_info, animation, out_format, bake_animation=True, export_with_geometry=False):
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        async with client:
-            task_id = await client.retarget_animation(
-                original_model_task_id=model_info["task_id"],
-                animation=animation,
-                out_format=out_format,
-                bake_animation=bake_animation,
-                export_with_geometry=export_with_geometry
-            )
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": model_info["file_prefix"],
-                        "output_directory": model_info["output_directory"]
-                    }
-            else:
-                raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        task_id = await client.retarget_animation(
+            original_model_task_id=model_info["task_id"],
+            animation=animation,
+            out_format=out_format,
+            bake_animation=bake_animation,
+            export_with_geometry=export_with_geometry
+        )
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoConvertNode:
     @classmethod
@@ -519,39 +514,38 @@ class TripoConvertNode:
                      pack_uv=False, bake=True, part_names=None, fbx_preset="blender", export_vertex_colors=False, export_orientation="+x", animate_in_place=False):
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        async with client:
-            # Handle part names
-            part_names_list = part_names.split('\n') if part_names else None
+        # Handle part names
+        part_names_list = part_names.split('\n') if part_names else None
 
-            task_id = await client.convert_model(
-                original_model_task_id=model_info["task_id"],
-                format=format,
-                quad=quad,
-                force_symmetry=force_symmetry,
-                face_limit=face_limit,
-                flatten_bottom=flatten_bottom,
-                flatten_bottom_threshold=flatten_bottom_threshold,
-                texture_size=texture_size,
-                texture_format=texture_format,
-                pivot_to_center_bottom=pivot_to_center_bottom,
-                scale_factor=scale_factor,
-                with_animation=with_animation,
-                pack_uv=pack_uv,
-                bake=bake,
-                part_names=part_names_list,
-                fbx_preset=fbx_preset,
-                export_vertex_colors=export_vertex_colors,
-                export_orientation=export_orientation,
-                animate_in_place=animate_in_place
-            )
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"])
-            else:
-                raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        task_id = await client.convert_model(
+            original_model_task_id=model_info["task_id"],
+            format=format,
+            quad=quad,
+            force_symmetry=force_symmetry,
+            face_limit=face_limit,
+            flatten_bottom=flatten_bottom,
+            flatten_bottom_threshold=flatten_bottom_threshold,
+            texture_size=texture_size,
+            texture_format=texture_format,
+            pivot_to_center_bottom=pivot_to_center_bottom,
+            scale_factor=scale_factor,
+            with_animation=with_animation,
+            pack_uv=pack_uv,
+            bake=bake,
+            part_names=part_names_list,
+            fbx_preset=fbx_preset,
+            export_vertex_colors=export_vertex_colors,
+            export_orientation=export_orientation,
+            animate_in_place=animate_in_place
+        )
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"])
+        else:
+            raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoMeshSegmentation:
     @classmethod
@@ -565,7 +559,6 @@ class TripoMeshSegmentation:
                 "segmentation_granularity": (["simple", "balanced", "detailed"], {"default": "balanced"}),
                 "ref_image": ("IMAGE",),
                 "split_by_connectivity": ("BOOLEAN", {"default": True}),
-                "apikey": ("STRING", {"default": ""}),
             }
         }
 
@@ -581,44 +574,42 @@ class TripoMeshSegmentation:
         segmentation_granularity=None,
         ref_image=None,
         split_by_connectivity=None,
-        apikey=None,
     ):
-        client, key = await GetTripoAPI(apikey or model_info.get("apikey"))
+        client, key = await GetTripoAPI(model_info.get("apikey"))
 
-        async with client:
-            kwargs = {}
-            is_v2 = model_version == "v2.0-20260430"
-            if is_v2:
-                if segmentation_granularity:
-                    kwargs["segmentation_granularity"] = segmentation_granularity
-                if split_by_connectivity is not None:
-                    kwargs["split_by_connectivity"] = split_by_connectivity
-                if ref_image is not None:
-                    img_path = save_tensor(
-                        ref_image,
-                        os.path.join(get_input_directory(), f"segment_ref_{uuid.uuid4().hex[:8]}"),
-                    )
-                    kwargs["ref_image"] = img_path
+        kwargs = {}
+        is_v2 = model_version == "v2.0-20260430"
+        if is_v2:
+            if segmentation_granularity:
+                kwargs["segmentation_granularity"] = segmentation_granularity
+            if split_by_connectivity is not None:
+                kwargs["split_by_connectivity"] = split_by_connectivity
+            if ref_image is not None:
+                img_path = save_tensor(
+                    ref_image,
+                    os.path.join(get_input_directory(), f"segment_ref_{uuid.uuid4().hex[:8]}"),
+                )
+                kwargs["ref_image"] = img_path
 
-            task_id = await client.mesh_segmentation(
-                original_model_task_id=model_info["task_id"],
-                model_version=model_version,
-                **kwargs
-            )
-            task = await client.wait_for_task(task_id, verbose=True, use_v3=is_v2)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": model_info["file_prefix"],
-                        "output_directory": model_info["output_directory"]
-                    }
-            else:
-                raise RuntimeError(f"Failed to segment mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        task_id = await client.mesh_segmentation(
+            original_model_task_id=model_info["task_id"],
+            model_version=model_version,
+            **kwargs
+        )
+        task = await client.wait_for_task(task_id, verbose=True, use_v3=is_v2)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }
+        else:
+            raise RuntimeError(f"Failed to segment mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoMeshCompletion:
     @classmethod
@@ -641,27 +632,26 @@ class TripoMeshCompletion:
     async def generate_mesh(self, model_info, model_version, part_names=None):
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        async with client:
-            part_names_list = part_names.split('\n') if part_names else None
-            task_id = await client.mesh_completion(
-                original_model_task_id=model_info["task_id"],
-                model_version=model_version,
-                part_names=part_names_list
-            )
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": model_info["file_prefix"],
-                        "output_directory": model_info["output_directory"]
-                    }
-            else:
-                raise RuntimeError(f"Failed to complete mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        part_names_list = part_names.split('\n') if part_names else None
+        task_id = await client.mesh_completion(
+            original_model_task_id=model_info["task_id"],
+            model_version=model_version,
+            part_names=part_names_list
+        )
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }
+        else:
+            raise RuntimeError(f"Failed to complete mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoSmartLowPoly:
     @classmethod
@@ -687,30 +677,29 @@ class TripoSmartLowPoly:
     async def generate_mesh(self, model_info, model_version, quad=False, part_names=None, face_limit=10000, bake=True):
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        async with client:
-            part_names_list = part_names.split('\n') if part_names else None
-            task_id = await client.smart_lowpoly(
-                original_model_task_id=model_info["task_id"],
-                model_version=model_version,
-                quad=quad,
-                part_names=part_names_list,
-                face_limit=face_limit,
-                bake=bake
-            )
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": model_info["file_prefix"],
-                        "output_directory": model_info["output_directory"]
-                    }
-            else:
-                raise RuntimeError(f"Failed to generate low poly mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        part_names_list = part_names.split('\n') if part_names else None
+        task_id = await client.smart_lowpoly(
+            original_model_task_id=model_info["task_id"],
+            model_version=model_version,
+            quad=quad,
+            part_names=part_names_list,
+            face_limit=face_limit,
+            bake=bake
+        )
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }
+        else:
+            raise RuntimeError(f"Failed to generate low poly mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoStylizeModel:
     @classmethod
@@ -731,26 +720,25 @@ class TripoStylizeModel:
     async def generate_mesh(self, model_info, style, block_size):
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        async with client:
-            task_id = await client.stylize_model(
-                original_model_task_id=model_info["task_id"],
-                style=style,
-                block_size=block_size
-            )
-            task = await client.wait_for_task(task_id, verbose=True)
-            if task.status == "success":
-                downloaded = await client.download_task_models(task, get_output_directory())
-                model_file = next(iter(downloaded.values()))
-                print(f"model_file: {model_file}")
-                return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                    {
-                        "task_id": task_id,
-                        "apikey": key,
-                        "file_prefix": model_info["file_prefix"],
-                        "output_directory": model_info["output_directory"]
-                    }
-            else:
-                raise RuntimeError(f"Failed to stylize mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        task_id = await client.stylize_model(
+            original_model_task_id=model_info["task_id"],
+            style=style,
+            block_size=block_size
+        )
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = next(iter(downloaded.values()))
+            print(f"model_file: {model_file}")
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }
+        else:
+            raise RuntimeError(f"Failed to stylize mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoImportModel:
     @classmethod
@@ -806,20 +794,19 @@ class TripoImportModel:
 
         client, key = await GetTripoAPI(apikey)
 
-        async with client:
-            task_id = await client.import_model(file=file_path)
-            task = await client.wait_for_task(task_id, verbose=True)
+        task_id = await client.import_model(file=file_path)
+        task = await client.wait_for_task(task_id, verbose=True)
 
-            if task.status == "success":
-                print(f"Model imported successfully. Task ID: {task_id}")
-                return ({
-                    "task_id": task_id,
-                    "apikey": key,
-                    "file_prefix": file_prefix if file_prefix else "",
-                    "output_directory": output_directory if output_directory else ""
-                },)
-            else:
-                raise RuntimeError(f"Failed to import model: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        if task.status == "success":
+            print(f"Model imported successfully. Task ID: {task_id}")
+            return ({
+                "task_id": task_id,
+                "apikey": key,
+                "file_prefix": file_prefix if file_prefix else "",
+                "output_directory": output_directory if output_directory else ""
+            },)
+        else:
+            raise RuntimeError(f"Failed to import model: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
