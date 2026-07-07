@@ -15,30 +15,31 @@ if not tripo_api_key:
             config = json.load(f)
             tripo_api_key = config["TRIPO_API_KEY"]
 
-# global tripo_client
-tripo_client = None  # Initialize the variable to None
+# cached endpoint preference (True=global/.ai, False=cn/.com)
+_tripo_is_global = None
 
 async def GetTripoAPI(apikey: str):
-    global tripo_client
+    global _tripo_is_global
     if not apikey:
         apikey = tripo_api_key
     if not apikey:
         raise RuntimeError("TRIPO API key is required")
-    if tripo_client is None:
-        balance = None
+
+    if _tripo_is_global is None:
         for is_global in [True, False]:
-            tripo_client = TripoClient(api_key=apikey, IS_GLOBAL=is_global)
+            client = TripoClient(api_key=apikey, IS_GLOBAL=is_global)
             try:
-                balance = await tripo_client.get_balance()
+                balance = await client.get_balance()
                 print(f"Tripo API balance: {balance}")
-                break
+                _tripo_is_global = is_global
+                return client, apikey
             except:
                 print(f'Failed to get Tripo API balance, trying again with global={is_global}')
                 pass
-        if balance is None:
-            tripo_client = None
-            raise RuntimeError("Failed to get Tripo API balance")
-    return tripo_client, apikey
+        raise RuntimeError("Failed to get Tripo API balance")
+    else:
+        client = TripoClient(api_key=apikey, IS_GLOBAL=_tripo_is_global)
+        return client, apikey
 
 
 def save_tensor(image_tensor, filename):
@@ -783,7 +784,10 @@ class TripoImportModel:
                 get_input_directory(),
                 f"url_import_{uuid.uuid4().hex[:8]}{ext}",
             )
-            urllib.request.urlretrieve(model_url.strip(), file_path)
+            req = urllib.request.Request(model_url.strip(), headers={'User-Agent': 'ComfyUI-Tripo/1.3.0'})
+            with urllib.request.urlopen(req) as resp:
+                with open(file_path, 'wb') as f:
+                    f.write(resp.read())
         elif model_file and model_file != "none":
             file_path = get_annotated_filepath(model_file)
 
