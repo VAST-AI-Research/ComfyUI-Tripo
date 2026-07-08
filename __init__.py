@@ -293,6 +293,11 @@ class TripoTextureModel:
         # Handle part names
         part_names_list = part_names.split('\n') if part_names else None
 
+        # Normalize empty strings to None (ComfyUI passes "" for unfilled STRING fields)
+        text_prompt = text_prompt if text_prompt and text_prompt.strip() else None
+        image_prompt_path = image_prompt_path if image_prompt_path else None
+        style_image_path = style_image_path if style_image_path else None
+
         task_id = await client.texture_model(
             original_model_task_id=model_info["task_id"],
             model_version=model_version,
