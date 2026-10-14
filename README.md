@@ -40,9 +40,16 @@ generated model is usually much larger, so connect it after **Tripo: Smart low p
 `Generate model → Smart low poly → Smart UV → Preview 3D / Preview Image`.
 
 ### Rigging notes
-`v2.0-20250506` runs as `v2.5-20260210`, exactly as on API v2. v2.5 rigs only accept the animal presets
-(`preset:quadruped:walk`, `preset:hexapod:walk`, `preset:octopod:walk`, `preset:serpentine:march`,
-`preset:aquatic:march`); use `v1.0-20240301` (the default for new nodes) for humanoid presets.
+Measured on the Tripo API (2026-10-15). New Rig nodes default to `v3.0-20260909`.
+
+| Rig version | Skeleton types it can rig | Humanoid presets | serpentine / aquatic presets | quadruped / hexapod / octopod presets |
+| --- | --- | --- | --- | --- |
+| `v3.0-20260909` | all | ✓ | ✓ | ✗ |
+| `v2.5-20260210` (and `v2.0-20250506`) | all | ✗ | ✓ | ✓ |
+| `v1.0-20240301` | biped only | ✓ | — | — |
+
+`unity`, `unreal` and `vrm` specs need `v2.5-20260210` or `v3.0-20260909`. The Rig and Retarget nodes stop
+with an explanation, before sending anything, when a combination in the table is known to fail.
 
 ## Installation
 ### [method1] From Source

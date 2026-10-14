@@ -153,7 +153,7 @@ class TripoAPIDraft:
                 "image_left": ("IMAGE",),
                 "image_back": ("IMAGE",),
                 "image_right": ("IMAGE",),
-                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123", "v3.0-20250812", "v3.1-20260211", "P1-20260311", "P2-20260801"], {"default": "v3.1-20260211", "tooltip": "v2.0-20240919 is no longer available on Tripo API v3."}),
+                "model_version": (["v1.4-20240625", "v2.5-20250123", "v3.0-20250812", "v3.1-20260211", "P1-20260311", "P2-20260801"], {"default": "v3.1-20260211"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "image_seed": ("INT", {"default": 42}),
@@ -394,15 +394,40 @@ class TripoRefineModel:
     async def generate_mesh(self, model_info):
         raise RuntimeError(RETIRED_NODE_MESSAGE.format(name="Tripo: Refine Draft model"))
 
+# Rig / retarget combinations measured on the live API (OV + CN, 2026-10-15). Combinations listed
+# here fail upstream, so the nodes stop before sending anything; everything else is passed through.
+SPECS_NEEDING_NEWER_RIG = {"unity", "unreal", "vrm"}  # fail on rig v1.0-20240301
+RIG_VERSIONS_FOR_NEWER_SPECS = {"v2.0-20250506", "v2.5-20260210", "v3.0-20260909"}
+RIG_V1_BIPED_ONLY = "v1.0-20240301"  # v1.0 rigs every non-biped type with 1004
+EFFECTIVE_RIG_VERSION = {"v2.0-20250506": "v2.5-20260210"}  # what the SDK actually sends
+RETARGET_PRESETS_FAILING_ON_RIG = {
+    "v2.5-20260210": "humanoid",  # every preset without a skeleton prefix
+    "v3.0-20260909": {"preset:quadruped:walk", "preset:hexapod:walk", "preset:octopod:walk"},
+}
+
+
+def _is_humanoid_preset(animation):
+    return animation.startswith("preset:") and animation.count(":") == 1
+
+
+def retarget_blocked_reason(rig_version, animation):
+    rule = RETARGET_PRESETS_FAILING_ON_RIG.get(rig_version)
+    if rule == "humanoid" and _is_humanoid_preset(animation):
+        return f"humanoid preset '{animation}' does not work on a {rig_version} rig; rig with v3.0-20260909 or v1.0-20240301"
+    if isinstance(rule, set) and animation in rule:
+        return f"preset '{animation}' does not work on a {rig_version} rig; rig this model with v2.5-20260210"
+    return None
+
+
 class TripoAnimateRigNode:
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
                 "model_info": ("MODEL_INFO",),
-                "model_version": (["v1.0-20240301", "v2.0-20250506", "v2.5-20260210", "v3.0-20260909"], {"default": "v1.0-20240301", "tooltip": "v2.0-20250506 runs as v2.5-20260210. v2.5 rigs only retarget animal presets (quadruped/hexapod/octopod/serpentine/aquatic); use v1.0-20240301 for humanoid presets."}),
+                "model_version": (["v1.0-20240301", "v2.0-20250506", "v2.5-20260210", "v3.0-20260909"], {"default": "v3.0-20260909", "tooltip": "v3.0: every skeleton type and every preset except quadruped/hexapod/octopod walk. v2.5: every skeleton type, animal presets only. v1.0: biped only. v2.0-20250506 runs as v2.5-20260210."}),
                 "out_format": (["glb", "fbx"], {"default": "glb"}),
-                "spec": (["mixamo", "tripo", "actorcore", "unity", "unreal", "vrm"], {"default": "tripo"}),
+                "spec": (["mixamo", "tripo", "actorcore", "unity", "unreal", "vrm"], {"default": "tripo", "tooltip": "unity / unreal / vrm need model_version v2.5-20260210 or v3.0-20260909."}),
             },
             "optional": {
                 "rig_type": (["auto", "biped", "quadruped", "hexapod", "octopod", "avian", "serpentine", "aquatic", "others"], {"default": "auto", "tooltip": "auto detects the skeleton with a rig check first."}),
@@ -415,6 +440,12 @@ class TripoAnimateRigNode:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, model_version, out_format, spec, rig_type="auto"):
+        if spec in SPECS_NEEDING_NEWER_RIG and model_version not in RIG_VERSIONS_FOR_NEWER_SPECS:
+            raise RuntimeError(f"spec '{spec}' needs model_version v2.5-20260210 or v3.0-20260909 "
+                               f"(got {model_version}); no request was sent.")
+        if model_version == RIG_V1_BIPED_ONLY and rig_type not in (None, "", "auto", "biped"):
+            raise RuntimeError(f"rig {RIG_V1_BIPED_ONLY} only supports biped models (rig_type '{rig_type}'); "
+                               "use v3.0-20260909 or v2.5-20260210. No request was sent.")
         client, key = await GetTripoAPI(model_info["apikey"])
 
         if not rig_type or rig_type == "auto":
@@ -429,6 +460,10 @@ class TripoAnimateRigNode:
             rig_type = check_result.output.rig_type
             if not rig_type:
                 raise RuntimeError("No suitable rig type found for the model")
+
+        if model_version == RIG_V1_BIPED_ONLY and rig_type != "biped":
+            raise RuntimeError(f"rig {RIG_V1_BIPED_ONLY} only supports biped models (this one is '{rig_type}'); "
+                               "use v3.0-20260909 or v2.5-20260210. No rig task was sent.")
 
         task_id = await client.rig_model(
             original_model_task_id=model_info["task_id"],
@@ -447,7 +482,8 @@ class TripoAnimateRigNode:
                     "task_id": task_id,
                     "apikey": key,
                     "file_prefix": model_info["file_prefix"],
-                    "output_directory": model_info["output_directory"]
+                    "output_directory": model_info["output_directory"],
+                    "rig_model_version": EFFECTIVE_RIG_VERSION.get(model_version, model_version),
                 }
         else:
             raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
@@ -490,6 +526,10 @@ class TripoAnimateRetargetNode:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, animation, out_format, bake_animation=True, export_with_geometry=False):
+        rig_version = model_info.get("rig_model_version")
+        blocked = retarget_blocked_reason(rig_version, animation) if rig_version else None
+        if blocked:
+            raise RuntimeError(blocked + ". No request was sent.")
         client, key = await GetTripoAPI(model_info["apikey"])
 
         task_id = await client.retarget_animation(
@@ -504,13 +544,15 @@ class TripoAnimateRetargetNode:
             downloaded = await client.download_task_models(task, get_output_directory())
             model_file = next(iter(downloaded.values()))
             print(f"model_file: {model_file}")
-            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                {
-                    "task_id": task_id,
-                    "apikey": key,
-                    "file_prefix": model_info["file_prefix"],
-                    "output_directory": model_info["output_directory"]
-                }
+            info = {
+                "task_id": task_id,
+                "apikey": key,
+                "file_prefix": model_info["file_prefix"],
+                "output_directory": model_info["output_directory"],
+            }
+            if rig_version:
+                info["rig_model_version"] = rig_version
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), info
         else:
             raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
