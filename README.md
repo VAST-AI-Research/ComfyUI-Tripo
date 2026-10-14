@@ -1,7 +1,15 @@
 # ComfyUI-Tripo
 This extension integrates Tripo into ComfyUI, allowing users to generate 3D models from text prompts or images directly within the ComfyUI interface.
 
+> **2.0.0 runs on Tripo API v3 and requires `tripo3d>=1.0.0,<2.0.0`.** The v2 API is shut down on
+> 2026-10-31, so 1.x of this extension (and `tripo3d` 0.x) stop working then. Update the extension and
+> run `pip install -r requirements.txt` (ComfyUI-Manager does this for you). Saved workflows keep
+> working: no input was renamed or removed. The **Refine** and **Stylize** nodes are removed and no longer
+> supported; a saved workflow that uses them loads with those two nodes reported missing — delete them.
+> See [CHANGELOG.md](CHANGELOG.md).
+
 ## ChangeLog
+- 20261015: 2.0.0 — migrate to Tripo API v3 (requires `tripo3d>=1.0.0,<2.0.0`); add **Tripo: Smart UV** node; Rig v2.5 / v3.0 and more skeleton specs; texture v3.5 (`fast`, `delight`); smart low poly v3.0 with Smart UV; mesh completion mode; remove **Refine** and **Stylize** (no longer supported)
 - 20260630: support Mesh Segmentation v2.0; support `model_url` for direct URL import
 - 20260528: add import model
 - 20250619: update to the newest api; add more nodes
@@ -16,14 +24,29 @@ This extension integrates Tripo into ComfyUI, allowing users to generate 3D mode
 - Generate 3D models from text prompts
 - Generate 3D models from images
 - Import models from URL (`model_url`)
-- Mesh Segmentation (v1 and v2.0)
+- Mesh Segmentation (v1 and v2.0) and mesh completion
+- Smart low poly (v2.0 / v3.0) and Smart UV
 - Animate 3D models
 - Convert format and retopologize
+
+Refine and Stylize were removed in 2.0.0 and are no longer supported.
+
+### Smart UV
+**Tripo: Smart UV** unwraps a model's UVs and outputs the model file, `MODEL_INFO` and the UV atlas as an
+`IMAGE`. The input must have at most 80,000 equivalent triangles (a quad counts as two); a freshly
+generated model is usually much larger, so connect it after **Tripo: Smart low poly**:
+`Generate model → Smart low poly → Smart UV → Preview 3D / Preview Image`.
+
+### Rigging notes
+`v2.0-20250506` runs as `v2.5-20260210`, exactly as on API v2. v2.5 rigs only accept the animal presets
+(`preset:quadruped:walk`, `preset:hexapod:walk`, `preset:octopod:walk`, `preset:serpentine:march`,
+`preset:aquatic:march`); use `v1.0-20240301` (the default for new nodes) for humanoid presets.
 
 ## Installation
 ### [method1] From Source
 - Clone or download this repository into your `ComfyUI/custom_nodes/` directory.
-- Install the required dependencies by running `pip install -r requirements.txt`.
+- Install the required dependencies by running `pip install -r requirements.txt` (installs `tripo3d>=1.0.0,<2.0.0`).
+- If ComfyUI prints `ComfyUI-Tripo needs tripo3d>=1.0.0,<2.0.0`, run that `pip install` command in the Python environment ComfyUI uses.
 
 ### [method2] From [ComfyUI-Manager](https://github.com/ltdrdata/ComfyUI-Manager)
 If you have ComfyUI-Manager, you can simply search "Tripo for ComfyUI" from `Custom Nodes Manager` and install these custom nodes 
@@ -70,10 +93,6 @@ This node allows you to generate a 3D model from three multiview input images.
 ### Texture a generated model
 ![img](workflows/texture_model.png)
 This node allows you to generate texture and pbr for a generated 3D model.
-
-### Refine a draft Mesh
-![img](workflows/refine_model.png)
-This node allows you to refine a 3D model from a draft model.
 
 ### Animation
 ![img](workflows/retarget.png)
