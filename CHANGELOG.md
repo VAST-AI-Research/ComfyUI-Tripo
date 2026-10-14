@@ -9,8 +9,7 @@ The Tripo v2 API is shut down on 2026-10-31. This release runs every node on Tri
 
 - Requires `tripo3d>=1.0.0,<2.0.0` (pinned in both `requirements.txt` and `pyproject.toml`).
 - Saved workflows keep loading: no input name, input order or existing option was changed or removed;
-  new inputs were added at the end with defaults that keep the old behaviour. The only removed nodes are
-  Refine and Stylize (see below).
+  new inputs were added at the end with defaults that keep the old behaviour. No node was removed.
 - If an incompatible `tripo3d` is installed, ComfyUI still starts; the log and every Tripo node report
   the `pip install "tripo3d>=1.0.0,<2.0.0"` command to run.
 - 1.3.x of this extension also keeps working on `tripo3d` 1.x until you update it.
@@ -33,9 +32,9 @@ The Tripo v2 API is shut down on 2026-10-31. This release runs every node on Tri
   presets; new Rig nodes default to `v1.0-20240301`, which accepts the humanoid presets.
 - `bake_animation` on Retarget is kept for saved workflows but ignored by API v3.
 
-### Removed
+### Deprecated
 
-- **Tripo: Refine Draft model** (`TripoRefineModel`) and **Tripo: Stylize model** (`TripoStylizeModel`)
-  are removed and no longer supported. A saved workflow containing them opens with those nodes reported
-  missing; delete them and the rest of the workflow runs. The `workflows/refine_model.png` example is
-  removed with them.
+- **Tripo: Refine Draft model** (`TripoRefineModel`) and **Tripo: Stylize model** (`TripoStylizeModel`):
+  Tripo no longer supports refine or stylize. The nodes are marked deprecated (hidden from the node search)
+  and kept with unchanged inputs so saved workflows still open; running them stops immediately with
+  "no longer supported … remove the node" — no request is sent and no credits are used.

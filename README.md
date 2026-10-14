@@ -4,12 +4,13 @@ This extension integrates Tripo into ComfyUI, allowing users to generate 3D mode
 > **2.0.0 runs on Tripo API v3 and requires `tripo3d>=1.0.0,<2.0.0`.** The v2 API is shut down on
 > 2026-10-31, so 1.x of this extension (and `tripo3d` 0.x) stop working then. Update the extension and
 > run `pip install -r requirements.txt` (ComfyUI-Manager does this for you). Saved workflows keep
-> working: no input was renamed or removed. The **Refine** and **Stylize** nodes are removed and no longer
-> supported; a saved workflow that uses them loads with those two nodes reported missing — delete them.
+> working: no node or input was renamed or removed. **Refine** and **Stylize** are no longer supported by
+> Tripo: the nodes are kept as deprecated (hidden from search) so saved workflows still open, but running
+> them stops with an explanation — remove them from the workflow.
 > See [CHANGELOG.md](CHANGELOG.md).
 
 ## ChangeLog
-- 20261015: 2.0.0 — migrate to Tripo API v3 (requires `tripo3d>=1.0.0,<2.0.0`); add **Tripo: Smart UV** node; Rig v2.5 / v3.0 and more skeleton specs; texture v3.5 (`fast`, `delight`); smart low poly v3.0 with Smart UV; mesh completion mode; remove **Refine** and **Stylize** (no longer supported)
+- 20261015: 2.0.0 — migrate to Tripo API v3 (requires `tripo3d>=1.0.0,<2.0.0`); add **Tripo: Smart UV** node; Rig v2.5 / v3.0 and more skeleton specs; texture v3.5 (`fast`, `delight`); smart low poly v3.0 with Smart UV; mesh completion mode; deprecate **Refine** and **Stylize** (no longer supported by Tripo; the nodes stop with an explanation)
 - 20260630: support Mesh Segmentation v2.0; support `model_url` for direct URL import
 - 20260528: add import model
 - 20250619: update to the newest api; add more nodes
@@ -29,7 +30,8 @@ This extension integrates Tripo into ComfyUI, allowing users to generate 3D mode
 - Animate 3D models
 - Convert format and retopologize
 
-Refine and Stylize were removed in 2.0.0 and are no longer supported.
+Refine and Stylize are no longer supported by Tripo. Their nodes are deprecated: hidden from the node
+search, still loadable in saved workflows, and they stop with an explanation instead of calling the API.
 
 ### Smart UV
 **Tripo: Smart UV** unwraps a model's UVs and outputs the model file, `MODEL_INFO` and the UV atlas as an
@@ -93,6 +95,10 @@ This node allows you to generate a 3D model from three multiview input images.
 ### Texture a generated model
 ![img](workflows/texture_model.png)
 This node allows you to generate texture and pbr for a generated 3D model.
+
+### Refine a draft Mesh (deprecated, no longer runs)
+![img](workflows/refine_model.png)
+Refine is no longer supported by Tripo; this example is kept for reference only.
 
 ### Animation
 ![img](workflows/retarget.png)

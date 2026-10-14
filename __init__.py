@@ -370,6 +370,30 @@ class TripoTextureModel:
             raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 
+RETIRED_NODE_MESSAGE = ("{name} is no longer supported: Tripo has retired this capability. "
+                        "Remove the node from the workflow (no request was sent, no credits were used).")
+
+
+class TripoRefineModel:
+    # Kept, hidden from search, so saved workflows still open; refine itself is retired.
+    DEPRECATED = True
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "model_info": ("MODEL_INFO",),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    async def generate_mesh(self, model_info):
+        raise RuntimeError(RETIRED_NODE_MESSAGE.format(name="Tripo: Refine Draft model"))
+
 class TripoAnimateRigNode:
     @classmethod
     def INPUT_TYPES(s):
@@ -722,6 +746,28 @@ class TripoSmartLowPoly:
         else:
             raise RuntimeError(f"Failed to generate low poly mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
+class TripoStylizeModel:
+    # Kept, hidden from search, so saved workflows still open; stylize itself is retired.
+    DEPRECATED = True
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "model_info": ("MODEL_INFO",),
+                "style": (["lego", "voxel", "voronoi", "minecraft"],),
+                "block_size": ("INT", {"default": 80, "min": 1, "max": 1000}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "MODEL_INFO")
+    RETURN_NAMES = ("model_file", "model_info")
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+
+    async def generate_mesh(self, model_info, style, block_size):
+        raise RuntimeError(RETIRED_NODE_MESSAGE.format(name="Tripo: Stylize model"))
+
 class TripoImportModel:
     @classmethod
     def INPUT_TYPES(s):
@@ -850,12 +896,14 @@ class TripoMeshUV:
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
     "TripoTextureModel": TripoTextureModel,
+    "TripoRefineModel": TripoRefineModel,
     "TripoAnimateRigNode": TripoAnimateRigNode,
     "TripoAnimateRetargetNode": TripoAnimateRetargetNode,
     "TripoConvertNode": TripoConvertNode,
     "TripoMeshSegmentation": TripoMeshSegmentation,
     "TripoMeshCompletion": TripoMeshCompletion,
     "TripoSmartLowPoly": TripoSmartLowPoly,
+    "TripoStylizeModel": TripoStylizeModel,
     "TripoImportModel": TripoImportModel,
     "TripoMeshUV": TripoMeshUV,
 }
@@ -863,12 +911,14 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoAPIDraft": "Tripo: Generate model",
     "TripoTextureModel": "Tripo: Texture model",
+    "TripoRefineModel": "Tripo: Refine Draft model (Deprecated)",
     "TripoAnimateRigNode": "Tripo: Rig model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
     "TripoConvertNode": "Tripo: Convert model",
     "TripoMeshSegmentation": "Tripo: Segment mesh",
     "TripoMeshCompletion": "Tripo: Complete mesh",
     "TripoSmartLowPoly": "Tripo: Smart low poly",
+    "TripoStylizeModel": "Tripo: Stylize model (Deprecated)",
     "TripoImportModel": "Tripo: Import model",
     "TripoMeshUV": "Tripo: Smart UV",
 }
