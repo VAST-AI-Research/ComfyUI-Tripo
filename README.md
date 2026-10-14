@@ -1,7 +1,16 @@
 # ComfyUI-Tripo
 This extension integrates Tripo into ComfyUI, allowing users to generate 3D models from text prompts or images directly within the ComfyUI interface.
 
+> **2.0.0 runs on Tripo API v3 and requires `tripo3d>=1.0.0,<2.0.0`.** The v2 API is shut down on
+> 2026-10-31, so 1.x of this extension (and `tripo3d` 0.x) stop working then. Update the extension and
+> run `pip install -r requirements.txt` (ComfyUI-Manager does this for you). Saved workflows keep
+> working: no node or input was renamed or removed. **Refine** and **Stylize** are no longer supported by
+> Tripo: the nodes are kept as deprecated (hidden from search) so saved workflows still open, but running
+> them stops with an explanation — remove them from the workflow.
+> See [CHANGELOG.md](CHANGELOG.md).
+
 ## ChangeLog
+- 20261015: 2.0.0 — migrate to Tripo API v3 (requires `tripo3d>=1.0.0,<2.0.0`); add **Tripo: Smart UV** node; Rig v2.5 / v3.0 and more skeleton specs; texture v3.5 (`fast`, `delight`); smart low poly v3.0 with Smart UV; mesh completion mode; deprecate **Refine** and **Stylize** (no longer supported by Tripo; the nodes stop with an explanation)
 - 20260630: support Mesh Segmentation v2.0; support `model_url` for direct URL import
 - 20260528: add import model
 - 20250619: update to the newest api; add more nodes
@@ -16,14 +25,37 @@ This extension integrates Tripo into ComfyUI, allowing users to generate 3D mode
 - Generate 3D models from text prompts
 - Generate 3D models from images
 - Import models from URL (`model_url`)
-- Mesh Segmentation (v1 and v2.0)
+- Mesh Segmentation (v1 and v2.0) and mesh completion
+- Smart low poly (v2.0 / v3.0) and Smart UV
 - Animate 3D models
 - Convert format and retopologize
+
+Refine and Stylize are no longer supported by Tripo. Their nodes are deprecated: hidden from the node
+search, still loadable in saved workflows, and they stop with an explanation instead of calling the API.
+
+### Smart UV
+**Tripo: Smart UV** unwraps a model's UVs and outputs the model file, `MODEL_INFO` and the UV atlas as an
+`IMAGE`. The input must have at most 80,000 equivalent triangles (a quad counts as two); a freshly
+generated model is usually much larger, so connect it after **Tripo: Smart low poly**:
+`Generate model → Smart low poly → Smart UV → Preview 3D / Preview Image`.
+
+### Rigging notes
+Measured on the Tripo API (2026-10-15). New Rig nodes default to `v3.0-20260909`.
+
+| Rig version | Skeleton types it can rig | Humanoid presets | serpentine / aquatic presets | quadruped / hexapod / octopod presets |
+| --- | --- | --- | --- | --- |
+| `v3.0-20260909` | all | ✓ | ✓ | ✗ |
+| `v2.5-20260210` (and `v2.0-20250506`) | all | ✗ | ✓ | ✓ |
+| `v1.0-20240301` | biped only | ✓ | — | — |
+
+`unity`, `unreal` and `vrm` specs need `v2.5-20260210` or `v3.0-20260909`. The Rig and Retarget nodes stop
+with an explanation, before sending anything, when a combination in the table is known to fail.
 
 ## Installation
 ### [method1] From Source
 - Clone or download this repository into your `ComfyUI/custom_nodes/` directory.
-- Install the required dependencies by running `pip install -r requirements.txt`.
+- Install the required dependencies by running `pip install -r requirements.txt` (installs `tripo3d>=1.0.0,<2.0.0`).
+- If ComfyUI prints `ComfyUI-Tripo needs tripo3d>=1.0.0,<2.0.0`, run that `pip install` command in the Python environment ComfyUI uses.
 
 ### [method2] From [ComfyUI-Manager](https://github.com/ltdrdata/ComfyUI-Manager)
 If you have ComfyUI-Manager, you can simply search "Tripo for ComfyUI" from `Custom Nodes Manager` and install these custom nodes 
@@ -71,9 +103,9 @@ This node allows you to generate a 3D model from three multiview input images.
 ![img](workflows/texture_model.png)
 This node allows you to generate texture and pbr for a generated 3D model.
 
-### Refine a draft Mesh
+### Refine a draft Mesh (deprecated, no longer runs)
 ![img](workflows/refine_model.png)
-This node allows you to refine a 3D model from a draft model.
+Refine is no longer supported by Tripo; this example is kept for reference only.
 
 ### Animation
 ![img](workflows/retarget.png)

@@ -1,10 +1,39 @@
 import os
 import json
 import uuid
-import urllib.request
 
 from folder_paths import get_input_directory, get_output_directory
-from tripo3d import TripoClient
+
+TRIPO3D_REQUIREMENT = "tripo3d>=1.0.0,<2.0.0"
+
+
+def _check_tripo3d():
+    """Return None when a compatible tripo3d is importable, otherwise a fix-it message.
+
+    Never raises: a missing or old SDK must not stop ComfyUI from loading; the nodes report it
+    when they run.
+    """
+    try:
+        import tripo3d
+    except Exception as e:
+        return f"tripo3d is not installed ({e}). Run: pip install \"{TRIPO3D_REQUIREMENT}\""
+    version = getattr(tripo3d, "__version__", "0")
+    try:
+        major = int(str(version).split(".")[0])
+    except ValueError:
+        major = 0
+    if major != 1:
+        return (f"ComfyUI-Tripo needs {TRIPO3D_REQUIREMENT} (Tripo API v3), found tripo3d {version}. "
+                f"Run: pip install \"{TRIPO3D_REQUIREMENT}\"")
+    return None
+
+
+_TRIPO3D_ERROR = _check_tripo3d()
+if _TRIPO3D_ERROR:
+    print(f"[ComfyUI-Tripo] {_TRIPO3D_ERROR}")
+    TripoClient = None
+else:
+    from tripo3d import TripoClient
 
 tripo_api_key = os.environ.get("TRIPO_API_KEY")
 if not tripo_api_key:
@@ -20,6 +49,8 @@ _tripo_is_global = None
 
 async def GetTripoAPI(apikey: str):
     global _tripo_is_global
+    if _TRIPO3D_ERROR:
+        raise RuntimeError(_TRIPO3D_ERROR)
     if not apikey:
         apikey = tripo_api_key
     if not apikey:
@@ -122,7 +153,7 @@ class TripoAPIDraft:
                 "image_left": ("IMAGE",),
                 "image_back": ("IMAGE",),
                 "image_right": ("IMAGE",),
-                "model_version": (["v1.4-20240625", "v2.0-20240919", "v2.5-20250123", "v3.0-20250812", "v3.1-20260211"], {"default": "v3.1-20260211"}),
+                "model_version": (["v1.4-20240625", "v2.5-20250123", "v3.0-20250812", "v3.1-20260211", "P1-20260311", "P2-20260801"], {"default": "v3.1-20260211"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "image_seed": ("INT", {"default": 42}),
@@ -140,6 +171,7 @@ class TripoAPIDraft:
                 "orientation": (["default", "align_image"], {"default": "default"}),
                 "file_prefix": ("STRING", {"default": ""}),
                 "output_directory": ("STRING", {"default": ""}),
+                "export_orientation": (["default", "+x", "-x", "+y", "-y"], {"default": "default"}),
             }
         }
         config["required"]["apikey"] = ("STRING", {"default": ""})
@@ -154,8 +186,12 @@ class TripoAPIDraft:
                       apikey=None, model_version=None, texture=None, pbr=None,
                       image_seed=None, model_seed=None, texture_seed=None, texture_quality=None, geometry_quality=None, texture_alignment=None,
                       face_limit=None, quad=None, compress=None, generate_parts=None, smart_low_poly=None,
-                      auto_size=None, orientation=None, file_prefix=None, output_directory=None):
+                      auto_size=None, orientation=None, file_prefix=None, output_directory=None,
+                      export_orientation=None):
         client, key = await GetTripoAPI(apikey)
+        extra = {}
+        if export_orientation and export_orientation != "default":
+            extra["export_orientation"] = export_orientation
         if mode == "text_to_model":
             if not prompt:
                 raise RuntimeError("Prompt is required")
@@ -174,7 +210,8 @@ class TripoAPIDraft:
                 compress=compress,
                 generate_parts=generate_parts,
                 smart_low_poly=smart_low_poly,
-                auto_size=auto_size
+                auto_size=auto_size,
+                **extra
             )
         elif mode == 'image_to_model':
             if image is None:
@@ -196,7 +233,8 @@ class TripoAPIDraft:
                 generate_parts=generate_parts,
                 smart_low_poly=smart_low_poly,
                 auto_size=auto_size,
-                orientation=orientation
+                orientation=orientation,
+                **extra
             )
         elif mode == 'multiview_to_model':
             if image is None:
@@ -230,7 +268,8 @@ class TripoAPIDraft:
                 generate_parts=generate_parts,
                 smart_low_poly=smart_low_poly,
                 auto_size=auto_size,
-                orientation=orientation
+                orientation=orientation,
+                **extra
             )
 
         task = await client.wait_for_task(task_id, verbose=True)
@@ -256,11 +295,11 @@ class TripoTextureModel:
                 "model_info": ("MODEL_INFO",),
             },
             "optional": {
-                "model_version": (["v2.5-20250123", "v3.0-20250812"], {"default": "v3.0-20250812"}),
+                "model_version": (["v2.5-20250123", "v3.0-20250812", "v3.5-20260815"], {"default": "v3.0-20250812"}),
                 "texture": ("BOOLEAN", {"default": True}),
                 "pbr": ("BOOLEAN", {"default": True}),
                 "texture_seed": ("INT", {"default": 42}),
-                "texture_quality": (["standard", "detailed"], {"default": "standard"}),
+                "texture_quality": (["standard", "detailed", "fast"], {"default": "standard", "tooltip": "fast requires model_version v3.5-20260815."}),
                 "texture_alignment": (["original_image", "geometry"], {"default": "original_image"}),
                 "text_prompt": ("STRING", {"multiline": True}),
                 "image_prompt": ("IMAGE",),
@@ -268,6 +307,7 @@ class TripoTextureModel:
                 "part_names": ("STRING", {"multiline": True}),
                 "compress": ("BOOLEAN", {"default": False}),
                 "bake": ("BOOLEAN", {"default": True}),
+                "delight": (["auto", "on", "off"], {"default": "auto", "tooltip": "Remove baked-in lighting (v3.5). auto lets the server decide."}),
             }
         }
 
@@ -278,7 +318,7 @@ class TripoTextureModel:
 
     async def generate_mesh(self, model_info, model_version, texture=None, pbr=None, texture_seed=None, texture_quality=None,
                      texture_alignment=None, text_prompt=None, image_prompt=None, style_image=None,
-                     part_names=None, compress=None, bake=None):
+                     part_names=None, compress=None, bake=None, delight="auto"):
         client, key = await GetTripoAPI(model_info["apikey"])
 
         # Handle image inputs
@@ -311,7 +351,8 @@ class TripoTextureModel:
             bake=bake,
             text_prompt=text_prompt,
             image_prompt=image_prompt_path,
-            style_image=style_image_path
+            style_image=style_image_path,
+            **({"delight": delight == "on"} if delight in ("on", "off") else {})
         )
         task = await client.wait_for_task(task_id, verbose=True)
         if task.status == "success":
@@ -329,7 +370,14 @@ class TripoTextureModel:
             raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 
+RETIRED_NODE_MESSAGE = ("{name} is no longer supported: Tripo has retired this capability. "
+                        "Remove the node from the workflow (no request was sent, no credits were used).")
+
+
 class TripoRefineModel:
+    # Kept, hidden from search, so saved workflows still open; refine itself is retired.
+    DEPRECATED = True
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -344,25 +392,32 @@ class TripoRefineModel:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info):
-        client, key = await GetTripoAPI(model_info["apikey"])
+        raise RuntimeError(RETIRED_NODE_MESSAGE.format(name="Tripo: Refine Draft model"))
 
-        task_id = await client.refine_model(
-            draft_model_task_id=model_info["task_id"]
-        )
-        task = await client.wait_for_task(task_id, verbose=True)
-        if task.status == "success":
-            downloaded = await client.download_task_models(task, get_output_directory())
-            model_file = next(iter(downloaded.values()))
-            print(f"model_file: {model_file}")
-            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                {
-                    "task_id": task_id,
-                    "apikey": key,
-                    "file_prefix": model_info["file_prefix"],
-                    "output_directory": model_info["output_directory"]
-                }
-        else:
-            raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+# Rig / retarget combinations measured on the live API (OV + CN, 2026-10-15). Combinations listed
+# here fail upstream, so the nodes stop before sending anything; everything else is passed through.
+SPECS_NEEDING_NEWER_RIG = {"unity", "unreal", "vrm"}  # fail on rig v1.0-20240301
+RIG_VERSIONS_FOR_NEWER_SPECS = {"v2.0-20250506", "v2.5-20260210", "v3.0-20260909"}
+RIG_V1_BIPED_ONLY = "v1.0-20240301"  # v1.0 rigs every non-biped type with 1004
+EFFECTIVE_RIG_VERSION = {"v2.0-20250506": "v2.5-20260210"}  # what the SDK actually sends
+RETARGET_PRESETS_FAILING_ON_RIG = {
+    "v2.5-20260210": "humanoid",  # every preset without a skeleton prefix
+    "v3.0-20260909": {"preset:quadruped:walk", "preset:hexapod:walk", "preset:octopod:walk"},
+}
+
+
+def _is_humanoid_preset(animation):
+    return animation.startswith("preset:") and animation.count(":") == 1
+
+
+def retarget_blocked_reason(rig_version, animation):
+    rule = RETARGET_PRESETS_FAILING_ON_RIG.get(rig_version)
+    if rule == "humanoid" and _is_humanoid_preset(animation):
+        return f"humanoid preset '{animation}' does not work on a {rig_version} rig; rig with v3.0-20260909 or v1.0-20240301"
+    if isinstance(rule, set) and animation in rule:
+        return f"preset '{animation}' does not work on a {rig_version} rig; rig this model with v2.5-20260210"
+    return None
+
 
 class TripoAnimateRigNode:
     @classmethod
@@ -370,9 +425,12 @@ class TripoAnimateRigNode:
         return {
             "required": {
                 "model_info": ("MODEL_INFO",),
-                "model_version": (["v1.0-20240301", "v2.0-20250506"], {"default": "v2.0-20250506"}),
+                "model_version": (["v1.0-20240301", "v2.0-20250506", "v2.5-20260210", "v3.0-20260909"], {"default": "v3.0-20260909", "tooltip": "v3.0: every skeleton type and every preset except quadruped/hexapod/octopod walk. v2.5: every skeleton type, animal presets only. v1.0: biped only. v2.0-20250506 runs as v2.5-20260210."}),
                 "out_format": (["glb", "fbx"], {"default": "glb"}),
-                "spec": (["mixamo", "tripo"], {"default": "tripo"}),
+                "spec": (["mixamo", "tripo", "actorcore", "unity", "unreal", "vrm"], {"default": "tripo", "tooltip": "unity / unreal / vrm need model_version v2.5-20260210 or v3.0-20260909."}),
+            },
+            "optional": {
+                "rig_type": (["auto", "biped", "quadruped", "hexapod", "octopod", "avian", "serpentine", "aquatic", "others"], {"default": "auto", "tooltip": "auto detects the skeleton with a rig check first."}),
             }
         }
 
@@ -381,20 +439,31 @@ class TripoAnimateRigNode:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    async def generate_mesh(self, model_info, model_version, out_format, spec):
+    async def generate_mesh(self, model_info, model_version, out_format, spec, rig_type="auto"):
+        if spec in SPECS_NEEDING_NEWER_RIG and model_version not in RIG_VERSIONS_FOR_NEWER_SPECS:
+            raise RuntimeError(f"spec '{spec}' needs model_version v2.5-20260210 or v3.0-20260909 "
+                               f"(got {model_version}); no request was sent.")
+        if model_version == RIG_V1_BIPED_ONLY and rig_type not in (None, "", "auto", "biped"):
+            raise RuntimeError(f"rig {RIG_V1_BIPED_ONLY} only supports biped models (rig_type '{rig_type}'); "
+                               "use v3.0-20260909 or v2.5-20260210. No request was sent.")
         client, key = await GetTripoAPI(model_info["apikey"])
 
-        # First check if model can be rigged
-        check_task_id = await client.check_riggable(model_info["task_id"])
-        check_result = await client.wait_for_task(check_task_id, verbose=True)
+        if not rig_type or rig_type == "auto":
+            # First check if model can be rigged
+            check_task_id = await client.check_riggable(model_info["task_id"])
+            check_result = await client.wait_for_task(check_task_id, verbose=True)
 
-        if not check_result.output.riggable:
-            raise RuntimeError("Model cannot be rigged")
+            if not check_result.output.riggable:
+                raise RuntimeError("Model cannot be rigged")
 
-        # Get the rig type from check result
-        rig_type = check_result.output.rig_type
-        if not rig_type:
-            raise RuntimeError("No suitable rig type found for the model")
+            # Get the rig type from check result
+            rig_type = check_result.output.rig_type
+            if not rig_type:
+                raise RuntimeError("No suitable rig type found for the model")
+
+        if model_version == RIG_V1_BIPED_ONLY and rig_type != "biped":
+            raise RuntimeError(f"rig {RIG_V1_BIPED_ONLY} only supports biped models (this one is '{rig_type}'); "
+                               "use v3.0-20260909 or v2.5-20260210. No rig task was sent.")
 
         task_id = await client.rig_model(
             original_model_task_id=model_info["task_id"],
@@ -413,7 +482,8 @@ class TripoAnimateRigNode:
                     "task_id": task_id,
                     "apikey": key,
                     "file_prefix": model_info["file_prefix"],
-                    "output_directory": model_info["output_directory"]
+                    "output_directory": model_info["output_directory"],
+                    "rig_model_version": EFFECTIVE_RIG_VERSION.get(model_version, model_version),
                 }
         else:
             raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
@@ -445,7 +515,7 @@ class TripoAnimateRetargetNode:
                 "out_format": (["glb", "fbx"], {"default": "glb"}),
             },
             "optional": {
-                "bake_animation": ("BOOLEAN", {"default": True}),
+                "bake_animation": ("BOOLEAN", {"default": True, "tooltip": "Ignored by Tripo API v3; kept so saved workflows load unchanged."}),
                 "export_with_geometry": ("BOOLEAN", {"default": False}),
             }
         }
@@ -456,6 +526,10 @@ class TripoAnimateRetargetNode:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, animation, out_format, bake_animation=True, export_with_geometry=False):
+        rig_version = model_info.get("rig_model_version")
+        blocked = retarget_blocked_reason(rig_version, animation) if rig_version else None
+        if blocked:
+            raise RuntimeError(blocked + ". No request was sent.")
         client, key = await GetTripoAPI(model_info["apikey"])
 
         task_id = await client.retarget_animation(
@@ -470,13 +544,15 @@ class TripoAnimateRetargetNode:
             downloaded = await client.download_task_models(task, get_output_directory())
             model_file = next(iter(downloaded.values()))
             print(f"model_file: {model_file}")
-            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                {
-                    "task_id": task_id,
-                    "apikey": key,
-                    "file_prefix": model_info["file_prefix"],
-                    "output_directory": model_info["output_directory"]
-                }
+            info = {
+                "task_id": task_id,
+                "apikey": key,
+                "file_prefix": model_info["file_prefix"],
+                "output_directory": model_info["output_directory"],
+            }
+            if rig_version:
+                info["rig_model_version"] = rig_version
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), info
         else:
             raise RuntimeError(f"Failed to generate mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
@@ -502,7 +578,7 @@ class TripoConvertNode:
                 "pack_uv": ("BOOLEAN", {"default": False}),
                 "bake": ("BOOLEAN", {"default": True}),
                 "part_names": ("STRING", {"multiline": True}),
-                "fbx_preset": (["blender", "mixamo", "3dsmax"], {"default": "blender"}),
+                "fbx_preset": (["blender", "mixamo", "3dsmax", "bake_scale"], {"default": "blender"}),
                 "export_vertex_colors": ("BOOLEAN", {"default": False}),
                 "export_orientation": (["+x", "+y", "-x", "-y"], {"default": "+x"}),
                 "animate_in_place": ("BOOLEAN", {"default": False}),
@@ -627,6 +703,7 @@ class TripoMeshCompletion:
             },
             "optional": {
                 "part_names": ("STRING", {"multiline": True}),
+                "completion_mode": (["default", "ai_completion", "quick_cap"], {"default": "default"}),
             }
         }
 
@@ -635,14 +712,15 @@ class TripoMeshCompletion:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    async def generate_mesh(self, model_info, model_version, part_names=None):
+    async def generate_mesh(self, model_info, model_version, part_names=None, completion_mode="default"):
         client, key = await GetTripoAPI(model_info["apikey"])
 
         part_names_list = part_names.split('\n') if part_names else None
         task_id = await client.mesh_completion(
             original_model_task_id=model_info["task_id"],
             model_version=model_version,
-            part_names=part_names_list
+            part_names=part_names_list,
+            completion_mode=completion_mode if completion_mode and completion_mode != "default" else None
         )
         task = await client.wait_for_task(task_id, verbose=True)
         if task.status == "success":
@@ -665,13 +743,14 @@ class TripoSmartLowPoly:
         return {
             "required": {
                 "model_info": ("MODEL_INFO",),
-                "model_version": (["P-v2.0-20251225"], {"default": "P-v2.0-20251225"}),
+                "model_version": (["P-v2.0-20251225", "P-v3.0-20260909"], {"default": "P-v2.0-20251225"}),
             },
             "optional": {
                 "quad": ("BOOLEAN", {"default": False}),
                 "part_names": ("STRING", {"multiline": True}),
-                "face_limit": ("INT", {"min": -1, "max": 20000, "default": 10000}),
+                "face_limit": ("INT", {"min": -1, "max": 20000, "default": 10000, "tooltip": "500-20000 (quad up to 10000); -1 uses the server default."}),
                 "bake": ("BOOLEAN", {"default": True}),
+                "smart_uv": ("BOOLEAN", {"default": False, "tooltip": "Smart UV unwrap; requires P-v3.0-20260909."}),
             }
         }
 
@@ -680,7 +759,8 @@ class TripoSmartLowPoly:
     FUNCTION = "generate_mesh"
     CATEGORY = "TripoAPI"
 
-    async def generate_mesh(self, model_info, model_version, quad=False, part_names=None, face_limit=10000, bake=True):
+    async def generate_mesh(self, model_info, model_version, quad=False, part_names=None, face_limit=10000, bake=True,
+                            smart_uv=False):
         client, key = await GetTripoAPI(model_info["apikey"])
 
         part_names_list = part_names.split('\n') if part_names else None
@@ -689,8 +769,9 @@ class TripoSmartLowPoly:
             model_version=model_version,
             quad=quad,
             part_names=part_names_list,
-            face_limit=face_limit,
-            bake=bake
+            face_limit=face_limit if face_limit and face_limit > 0 else None,
+            bake=bake,
+            smart_uv=True if smart_uv else None
         )
         task = await client.wait_for_task(task_id, verbose=True)
         if task.status == "success":
@@ -708,6 +789,9 @@ class TripoSmartLowPoly:
             raise RuntimeError(f"Failed to generate low poly mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
 class TripoStylizeModel:
+    # Kept, hidden from search, so saved workflows still open; stylize itself is retired.
+    DEPRECATED = True
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -724,27 +808,7 @@ class TripoStylizeModel:
     CATEGORY = "TripoAPI"
 
     async def generate_mesh(self, model_info, style, block_size):
-        client, key = await GetTripoAPI(model_info["apikey"])
-
-        task_id = await client.stylize_model(
-            original_model_task_id=model_info["task_id"],
-            style=style,
-            block_size=block_size
-        )
-        task = await client.wait_for_task(task_id, verbose=True)
-        if task.status == "success":
-            downloaded = await client.download_task_models(task, get_output_directory())
-            model_file = next(iter(downloaded.values()))
-            print(f"model_file: {model_file}")
-            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
-                {
-                    "task_id": task_id,
-                    "apikey": key,
-                    "file_prefix": model_info["file_prefix"],
-                    "output_directory": model_info["output_directory"]
-                }
-        else:
-            raise RuntimeError(f"Failed to stylize mesh: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+        raise RuntimeError(RETIRED_NODE_MESSAGE.format(name="Tripo: Stylize model"))
 
 class TripoImportModel:
     @classmethod
@@ -784,15 +848,8 @@ class TripoImportModel:
         from folder_paths import get_annotated_filepath
 
         if model_url and model_url.strip():
-            ext = os.path.splitext(model_url.split("?")[0])[-1] or ".glb"
-            file_path = os.path.join(
-                get_input_directory(),
-                f"url_import_{uuid.uuid4().hex[:8]}{ext}",
-            )
-            req = urllib.request.Request(model_url.strip(), headers={'User-Agent': 'ComfyUI-Tripo/1.3.0'})
-            with urllib.request.urlopen(req) as resp:
-                with open(file_path, 'wb') as f:
-                    f.write(resp.read())
+            # apiv3 fetches the URL itself.
+            file_path = model_url.strip()
         elif model_file and model_file != "none":
             file_path = get_annotated_filepath(model_file)
 
@@ -817,6 +874,67 @@ class TripoImportModel:
         else:
             raise RuntimeError(f"Failed to import model: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
 
+def load_image_tensor(path):
+    """Load an image file as a ComfyUI IMAGE tensor ([1, H, W, 3], float32 in 0..1)."""
+    import numpy as np
+    import torch
+    from PIL import Image
+    with Image.open(path) as img:
+        array = np.array(img.convert("RGB")).astype(np.float32) / 255.0
+    return torch.from_numpy(array)[None,]
+
+
+class TripoMeshUV:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "model_info": ("MODEL_INFO",),
+            },
+            "optional": {
+                "export_orientation": (["default", "+x", "-x", "+y", "-y"], {"default": "default"}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "MODEL_INFO", "IMAGE")
+    RETURN_NAMES = ("model_file", "model_info", "uv_render")
+    FUNCTION = "generate_mesh"
+    CATEGORY = "TripoAPI"
+    DESCRIPTION = ("Smart UV: unwrap the model's UVs and preview the UV atlas. The input must have at most "
+                   "80,000 equivalent triangles (a quad counts as two); a freshly generated model is usually "
+                   "far larger, so connect it after Tripo: Smart low poly.")
+
+    async def generate_mesh(self, model_info, export_orientation="default"):
+        client, key = await GetTripoAPI(model_info["apikey"])
+
+        extra = {}
+        if export_orientation and export_orientation != "default":
+            extra["export_orientation"] = export_orientation
+        task_id = await client.mesh_uv(original_model_task_id=model_info["task_id"], **extra)
+        task = await client.wait_for_task(task_id, verbose=True)
+        if task.status == "success":
+            downloaded = await client.download_task_models(task, get_output_directory())
+            model_file = downloaded.get("model")
+            if not model_file:
+                raise RuntimeError(f"Smart UV task {task_id} returned no model")
+            print(f"model_file: {model_file}")
+            uv_path = downloaded.get("uv_render")
+            if uv_path:
+                uv_render = load_image_tensor(uv_path)
+            else:
+                import torch
+                uv_render = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+            return rename_model(model_file, model_info["file_prefix"], model_info["output_directory"]), \
+                {
+                    "task_id": task_id,
+                    "apikey": key,
+                    "file_prefix": model_info["file_prefix"],
+                    "output_directory": model_info["output_directory"]
+                }, \
+                uv_render
+        else:
+            raise RuntimeError(f"Failed to unwrap UVs: {task.error_code} {task.error_msg if hasattr(task, 'error_msg') else ''}")
+
 NODE_CLASS_MAPPINGS = {
     "TripoAPIDraft": TripoAPIDraft,
     "TripoTextureModel": TripoTextureModel,
@@ -829,20 +947,22 @@ NODE_CLASS_MAPPINGS = {
     "TripoSmartLowPoly": TripoSmartLowPoly,
     "TripoStylizeModel": TripoStylizeModel,
     "TripoImportModel": TripoImportModel,
+    "TripoMeshUV": TripoMeshUV,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TripoAPIDraft": "Tripo: Generate model",
     "TripoTextureModel": "Tripo: Texture model",
-    "TripoRefineModel": "Tripo: Refine Draft model",
+    "TripoRefineModel": "Tripo: Refine Draft model (Deprecated)",
     "TripoAnimateRigNode": "Tripo: Rig model",
     "TripoAnimateRetargetNode": "Tripo: Retarget rigged model",
     "TripoConvertNode": "Tripo: Convert model",
     "TripoMeshSegmentation": "Tripo: Segment mesh",
     "TripoMeshCompletion": "Tripo: Complete mesh",
     "TripoSmartLowPoly": "Tripo: Smart low poly",
-    "TripoStylizeModel": "Tripo: Stylize model",
+    "TripoStylizeModel": "Tripo: Stylize model (Deprecated)",
     "TripoImportModel": "Tripo: Import model",
+    "TripoMeshUV": "Tripo: Smart UV",
 }
 
 WEB_DIRECTORY = "./web"
